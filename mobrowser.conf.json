@@ -1,0 +1,73 @@
+{
+  "app": {
+    "name": "Sidekick",
+    "version": {
+      "major": "0",
+      "minor": "1",
+      "patch": "0"
+    },
+    "author": "",
+    "copyright": "© 2026 Henry. All rights reserved.",
+    "description": "Turn any idea into a white-background hand-drawn illustration starring your own avatar.",
+    "locales": ["en-US"],
+    "trustedOrigins": [],
+    "bundle": {
+      "macOS": {
+        "icon": "assets/app.icns",
+        "bundleID": "com.henry.Sidekick",
+        "codesignIdentity": "${MAC_CODESIGN_IDENTITY}",
+        "codesignEntitlements": "assets/entitlements.plist",
+        "teamID": "${MAC_TEAM_ID}",
+        "appleID": "${MAC_APPLE_ID}",
+        "password": "${MAC_APPLE_PASSWORD}",
+        "installer": {
+          "dmg": {
+            "name": "",
+            "volumeName": "",
+            "volumeIcon": "assets/app.icns",
+            "eula": "",
+            "window": {
+              "textSize": 14,
+              "skipPrettifying": false,
+              "backgroundImage": "",
+              "position": {
+                "x": 500,
+                "y": 400
+              },
+              "size": {
+                "width": 600,
+                "height": 400
+              },
+              "icon": {
+                "size": 150,
+                "position": {
+                  "x": 160,
+                  "y": 160
+                }
+              },
+              "appDropLink": {
+                "x": 430,
+                "y": 160
+              }
+            }
+          }
+        }
+      },
+      "Windows": {
+        "icon": "assets/app.ico",
+        "signCommand": "",
+        "installer": {
+          "exe": {
+            "name": "",
+            "icon": "assets/app.ico",
+            "installationGif": "",
+            "deltaStrategy": "BestSpeed"
+          }
+        }
+      },
+      "Linux": {
+        "icon": "assets/app.png"
+      }
+    }
+  }
+}

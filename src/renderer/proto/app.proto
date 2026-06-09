@@ -1,0 +1,100 @@
+syntax = "proto3";
+
+import "google/protobuf/empty.proto";
+
+message SetThemeRequest {
+  string theme = 1;
+}
+
+message SetUnsavedIconStateRequest {
+  // True while the user has icon work that has not been saved to disk.
+  bool unsaved = 1;
+}
+
+message SaveIconRequest {
+  // 1024×1024 PNG bytes with squircle mask pre-applied.
+  bytes image_data = 1;
+}
+
+message SaveIconResponse {
+  string saved_path = 1;
+  bool canceled = 2;
+  // Full path to the saved .icns file when the save succeeded.
+  string icns_path = 3;
+}
+
+message ShowPathInFinderRequest {
+  // Absolute path to a file or folder to reveal in Finder.
+  string path = 1;
+}
+
+message GenerateIconRequest {
+  string prompt = 1;
+  string negative_prompt = 2;
+  // Base64-encoded PNG, no data URL prefix. Empty = no reference image.
+  string reference_image = 3;
+  // Seed for reproducibility. 0 = pick automatically.
+  int32 seed = 4;
+}
+
+message GenerateIconResponse {
+  // Base64-encoded PNG images, no data URL prefix.
+  repeated string images = 1;
+  string error = 2;
+}
+
+message GetOpenAIApiKeyStatusRequest {}
+
+message GetOpenAIApiKeyStatusResponse {
+  // True when the OpenAI provider is active (a stored API key is required).
+  bool openai_key_required = 1;
+  // True when a non-empty OpenAI API key is already stored in preferences.
+  bool has_openai_key = 2;
+}
+
+message SetOpenAIApiKeyRequest {
+  string api_key = 1;
+}
+
+message SetOpenAIApiKeyResponse {
+  // Empty on success; otherwise a short error message for the user.
+  string error = 1;
+}
+
+message GetStoredOpenAIApiKeyRequest {}
+
+message GetStoredOpenAIApiKeyResponse {
+  // Value from app preferences; empty if none saved.
+  string api_key = 1;
+}
+
+message OpenExternalUrlRequest {
+  // https URL (or other scheme) to open in the system default handler.
+  string url = 1;
+}
+
+message PickReferenceImageRequest {}
+
+message PickReferenceImageResponse {
+  // Base64-encoded image bytes, no data URL prefix. Empty when canceled/failed.
+  string image_b64 = 1;
+  // MIME type of the selected image, e.g. "image/png".
+  string mime = 2;
+  // True when the user dismissed the dialog without choosing a file.
+  bool canceled = 3;
+  // Empty on success; otherwise a short error message for the user.
+  string error = 4;
+}
+
+service AppService {
+  rpc SetTheme(SetThemeRequest) returns (google.protobuf.Empty);
+  rpc SetUnsavedIconState(SetUnsavedIconStateRequest) returns (google.protobuf.Empty);
+  rpc SaveIcon(SaveIconRequest) returns (SaveIconResponse);
+  rpc ShowPathInFinder(ShowPathInFinderRequest) returns (google.protobuf.Empty);
+  rpc GenerateIcon(GenerateIconRequest) returns (GenerateIconResponse);
+  rpc GetOpenAIApiKeyStatus(GetOpenAIApiKeyStatusRequest) returns (GetOpenAIApiKeyStatusResponse);
+  rpc GetStoredOpenAIApiKey(GetStoredOpenAIApiKeyRequest) returns (GetStoredOpenAIApiKeyResponse);
+  rpc SetOpenAIApiKey(SetOpenAIApiKeyRequest) returns (SetOpenAIApiKeyResponse);
+  rpc OpenExternalUrl(OpenExternalUrlRequest) returns (google.protobuf.Empty);
+  rpc PickReferenceImage(PickReferenceImageRequest) returns (PickReferenceImageResponse);
+}
