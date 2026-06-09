@@ -9,7 +9,7 @@ import {
 import { PromptInput, type PrimaryAction } from "@/components/prompt-input"
 import { ErrorModal, generationErrorSuggestsApiKeyIssue } from "@/components/error-modal"
 import { SaveSuccessModal } from "@/components/save-success-modal"
-import { SquircleClipDefs } from "@/components/squircle-clip-defs"
+import { AvatarSetupModal } from "@/components/avatar-setup-modal"
 import { TitleBarStatus } from "@/components/title-bar-status"
 import type { IconState } from "@/components/icon-types"
 import { useIconPipeline } from "@/lib/icon-pipeline"
@@ -27,13 +27,16 @@ export function AppContent() {
   // Unmasked square version of baseIconSrc, used when writing the .icns file.
   const [rawBaseIconSrc, setRawBaseIconSrc] = useState<string | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
-  const [saveSuccess, setSaveSuccess] = useState<{ folderPath: string; icnsPath: string } | null>(
+  const [saveSuccess, setSaveSuccess] = useState<{ folderPath: string; imagePath: string } | null>(
     null
   )
   const [iconDirty, setIconDirty] = useState(false)
   const [openAIApiKeyStartupOpen, setOpenAIApiKeyStartupOpen] = useState(false)
   const [openAIApiKeyManageReason, setOpenAIApiKeyManageReason] =
     useState<OpenAIApiKeyManageReason | null>(null)
+  // Avatar gate: the persistent reference character. Blocking on first run.
+  const [avatarReady, setAvatarReady] = useState(false)
+  const [avatarModal, setAvatarModal] = useState<"setup" | "settings" | null>(null)
   const resumeAfterCancelRef = useRef<ResumeAfterCancel>("idle")
 
   const pipeline = useIconPipeline()
@@ -54,6 +57,15 @@ export function AppContent() {
         if (required === true && hasKey !== true) {
           setOpenAIApiKeyStartupOpen(true)
         }
+      })
+      .catch(() => {})
+
+    // Avatar gate: open the blocking setup modal on first run.
+    ipc.app
+      .GetAvatar({})
+      .then((r) => {
+        setAvatarReady(r.hasAvatar)
+        if (!r.hasAvatar) setAvatarModal("setup")
       })
       .catch(() => {})
   }, [])
@@ -95,6 +107,10 @@ export function AppContent() {
 
   const startGeneration = () => {
     if (!prompt.trim() || iconState === "generating") return
+    if (!avatarReady) {
+      setAvatarModal("setup")
+      return
+    }
     resumeAfterCancelRef.current =
       iconState === "refine" ? "refine" : iconState === "generated" ? "generated" : "idle"
     setSelectedVariant(null)
@@ -122,27 +138,24 @@ export function AppContent() {
   }
 
   const handleSave = async () => {
-    // Use the unmasked square image for the .icns file.  macOS applies its own
-    // squircle clip when rendering app icons in the Dock and Cmd+Tab; saving a
-    // pre-masked image (with transparent corners) causes the OS to put a gray
-    // background plate behind the icon and shrink it to ~50%.
-    const rawSrc =
+    // The chosen 16:9 illustration is saved exactly as generated.
+    const src =
       iconState === "refine"
         ? rawBaseIconSrc
         : selectedVariant !== null
           ? pipeline.rawVariants[selectedVariant]
           : null
-    if (!rawSrc) return
+    if (!src) return
 
     try {
-      // Fetch the object URL and convert to Uint8Array for IPC transfer.
-      const response = await fetch(rawSrc)
+      // Fetch the data URL and convert to Uint8Array for IPC transfer.
+      const response = await fetch(src)
       const buffer = await response.arrayBuffer()
       const imageData = new Uint8Array(buffer)
       const saved = await ipc.app.SaveIcon({ imageData })
-      if (!saved.canceled && saved.icnsPath) {
+      if (!saved.canceled && saved.imagePath) {
         setIconDirty(false)
-        setSaveSuccess({ folderPath: saved.savedPath, icnsPath: saved.icnsPath })
+        setSaveSuccess({ folderPath: saved.savedPath, imagePath: saved.imagePath })
       }
     } catch {
       // Silently ignore IPC errors.
@@ -151,8 +164,8 @@ export function AppContent() {
 
   const inputPlaceholder =
     iconState === "refine"
-      ? "Make changes to the icon or describe a new idea…"
-      : "Describe your app icon…"
+      ? "Refine this illustration, or describe a new idea…"
+      : "Describe the idea to illustrate…"
 
   const primaryAction: PrimaryAction =
     iconState === "generating"
@@ -191,8 +204,6 @@ export function AppContent() {
 
   return (
     <div className="dark flex flex-col h-screen bg-background text-foreground overflow-hidden">
-      <SquircleClipDefs />
-
       {errorMessage && (
         <ErrorModal
           message={errorMessage}
@@ -211,12 +222,23 @@ export function AppContent() {
       {saveSuccess && (
         <SaveSuccessModal
           folderPath={saveSuccess.folderPath}
-          icnsPath={saveSuccess.icnsPath}
+          imagePath={saveSuccess.imagePath}
           onClose={() => setSaveSuccess(null)}
         />
       )}
 
-      {openAIApiKeyStartupOpen && (
+      {/* Avatar gate takes priority over the API-key prompt on first run. */}
+      {avatarModal !== null && (
+        <AvatarSetupModal
+          onSaved={() => {
+            setAvatarReady(true)
+            setAvatarModal(null)
+          }}
+          onClose={avatarModal === "settings" ? () => setAvatarModal(null) : undefined}
+        />
+      )}
+
+      {openAIApiKeyStartupOpen && avatarModal === null && (
         <OpenAIApiKeyStartupModal onSaved={() => setOpenAIApiKeyStartupOpen(false)} />
       )}
       {openAIApiKeyManageReason !== null && (
@@ -285,6 +307,7 @@ export function AppContent() {
           attachments={attachments}
           onAttachmentsChange={setAttachments}
           onOpenApiKeySettings={() => setOpenAIApiKeyManageReason("settings")}
+          onOpenAvatarSettings={() => setAvatarModal("settings")}
         />
       </div>
     </div>

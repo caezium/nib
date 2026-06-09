@@ -12,15 +12,16 @@ message SetUnsavedIconStateRequest {
 }
 
 message SaveIconRequest {
-  // 1024×1024 PNG bytes with squircle mask pre-applied.
+  // 16:9 PNG bytes of the chosen illustration variant.
   bytes image_data = 1;
 }
 
 message SaveIconResponse {
+  // Parent folder of the saved file.
   string saved_path = 1;
   bool canceled = 2;
-  // Full path to the saved .icns file when the save succeeded.
-  string icns_path = 3;
+  // Full path to the saved .png file when the save succeeded.
+  string image_path = 3;
 }
 
 message ShowPathInFinderRequest {
@@ -86,6 +87,29 @@ message PickReferenceImageResponse {
   string error = 4;
 }
 
+// --- Avatar (the persistent reference character) ---
+
+message SetAvatarRequest {
+  // Base64-encoded image bytes, no data URL prefix.
+  string image_b64 = 1;
+  // MIME type, e.g. "image/png".
+  string mime = 2;
+}
+
+message SetAvatarResponse {
+  // Empty on success; otherwise a short error message for the user.
+  string error = 1;
+}
+
+message GetAvatarRequest {}
+
+message GetAvatarResponse {
+  // Stored avatar, base64 with no data URL prefix; empty when none saved.
+  string image_b64 = 1;
+  string mime = 2;
+  bool has_avatar = 3;
+}
+
 service AppService {
   rpc SetTheme(SetThemeRequest) returns (google.protobuf.Empty);
   rpc SetUnsavedIconState(SetUnsavedIconStateRequest) returns (google.protobuf.Empty);
@@ -97,4 +121,6 @@ service AppService {
   rpc SetOpenAIApiKey(SetOpenAIApiKeyRequest) returns (SetOpenAIApiKeyResponse);
   rpc OpenExternalUrl(OpenExternalUrlRequest) returns (google.protobuf.Empty);
   rpc PickReferenceImage(PickReferenceImageRequest) returns (PickReferenceImageResponse);
+  rpc SetAvatar(SetAvatarRequest) returns (SetAvatarResponse);
+  rpc GetAvatar(GetAvatarRequest) returns (GetAvatarResponse);
 }

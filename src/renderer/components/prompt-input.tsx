@@ -5,6 +5,7 @@ import {
   ImagePlus,
   RefreshCw,
   Settings2,
+  UserRound,
   X,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -35,6 +36,7 @@ export function PromptInput({
   attachments,
   onAttachmentsChange,
   onOpenApiKeySettings,
+  onOpenAvatarSettings,
 }: {
   value: string
   onChange: (v: string) => void
@@ -48,6 +50,7 @@ export function PromptInput({
   attachments: string[]
   onAttachmentsChange: (attachments: string[]) => void
   onOpenApiKeySettings: () => void
+  onOpenAvatarSettings: () => void
 }) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -151,14 +154,28 @@ export function PromptInput({
 
           <button
             type="button"
+            onClick={onOpenAvatarSettings}
+            className={cn(
+              "flex items-center justify-center w-8 h-8 rounded-full",
+              "text-muted-foreground hover:text-foreground hover:bg-white/10",
+              "transition-colors shrink-0"
+            )}
+            title="Change your avatar"
+            aria-label="Change your avatar"
+          >
+            <UserRound className="w-4 h-4" />
+          </button>
+
+          <button
+            type="button"
             onClick={onOpenApiKeySettings}
             className={cn(
               "flex items-center justify-center w-8 h-8 rounded-full",
               "text-muted-foreground hover:text-foreground hover:bg-white/10",
               "transition-colors shrink-0"
             )}
-            title="OpenAI API key"
-            aria-label="OpenAI API key settings"
+            title="API key"
+            aria-label="API key settings"
           >
             <Settings2 className="w-4 h-4" />
           </button>

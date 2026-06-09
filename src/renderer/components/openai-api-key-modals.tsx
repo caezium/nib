@@ -133,7 +133,7 @@ export function OpenAIApiKeyStartupModal({ onSaved }: { onSaved: () => void }) {
     >
       <div className="px-4 py-3 space-y-2">
       <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">
-      Icon generation uses OpenAI or OpenRouter. Paste an OpenAI key
+      Image generation uses OpenAI or OpenRouter. Paste an OpenAI key
       (<span className="font-mono">sk-…</span>) or an OpenRouter key
       (<span className="font-mono">sk-or-…</span>); it is stored only in this
       app&apos;s preferences on your computer.

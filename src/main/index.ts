@@ -1,11 +1,11 @@
 import { app, BrowserWindow, desktop, ipc, Menu, MenuItem, MenuWithRole, prefs, Theme } from '@mobrowser/api';
-import { exec } from 'node:child_process';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
-import * as os from 'node:os';
 import {
   GenerateIconRequest,
   GenerateIconResponse,
+  GetAvatarRequest,
+  GetAvatarResponse,
   GetOpenAIApiKeyStatusRequest,
   GetOpenAIApiKeyStatusResponse,
   GetStoredOpenAIApiKeyRequest,
@@ -15,6 +15,8 @@ import {
   PickReferenceImageResponse,
   SaveIconRequest,
   SaveIconResponse,
+  SetAvatarRequest,
+  SetAvatarResponse,
   SetOpenAIApiKeyRequest,
   SetOpenAIApiKeyResponse,
   SetThemeRequest,
@@ -29,91 +31,14 @@ import {
   hasApiKeyInPrefs,
   API_KEY_PREFS_KEY,
 } from './lib/openai-api-key';
+import {
+  getAvatarB64,
+  getAvatarMime,
+  hasAvatar,
+  setAvatar,
+} from './lib/avatar-store';
 
-// ---------------------------------------------------------------------------
-// Icon resize constants
-// ---------------------------------------------------------------------------
-
-// The 10 required macOS icon sizes: [filename, pixel dimension].
-const ICON_SIZES: [string, number][] = [
-  ['icon_16x16.png',      16],
-  ['icon_16x16@2x.png',   32],
-  ['icon_32x32.png',      32],
-  ['icon_32x32@2x.png',   64],
-  ['icon_128x128.png',   128],
-  ['icon_128x128@2x.png', 256],
-  ['icon_256x256.png',   256],
-  ['icon_256x256@2x.png', 512],
-  ['icon_512x512.png',   512],
-  ['icon_512x512@2x.png', 1024],
-];
-
-const GITHUB_REPOSITORY_URL = 'https://github.com/mo-browser-apps/icons';
-
-function run(cmd: string): Promise<void> {
-  return new Promise((resolve, reject) => {
-    exec(cmd, (err) => (err ? reject(err) : resolve()));
-  });
-}
-
-/** Normalize save dialog output to .icns path and companion .iconset directory. */
-function resolveSaveTargets(pickedPath: string): {
-  parentDir: string;
-  icnsPath: string;
-  iconsetDir: string;
-  baseName: string;
-} {
-  const resolved = path.resolve(pickedPath);
-  const parentDir = path.dirname(resolved);
-  let base = path.basename(resolved);
-  const ext = path.extname(base);
-  if (ext.toLowerCase() === '.icns') {
-    base = path.basename(base, ext);
-  }
-  if (!base || base === '.' || base === '..') {
-    base = 'App';
-  }
-  const icnsPath = path.join(parentDir, `${base}.icns`);
-  const iconsetDir = path.join(parentDir, `${base}.iconset`);
-  return { parentDir, icnsPath, iconsetDir, baseName: base };
-}
-
-async function icnsOutputsExist(icnsPath: string, iconsetDir: string): Promise<boolean> {
-  try {
-    await fs.access(icnsPath);
-    return true;
-  } catch {
-    /* not found. */
-  }
-  try {
-    const st = await fs.stat(iconsetDir);
-    return st.isDirectory();
-  } catch {
-    return false;
-  }
-}
-
-async function removeIcnsOutputs(icnsPath: string, iconsetDir: string): Promise<void> {
-  await fs.rm(iconsetDir, { recursive: true, force: true });
-  await fs.unlink(icnsPath).catch(() => {});
-}
-
-async function buildIcnsAt(imageData: Buffer, iconsetDir: string, icnsPath: string): Promise<void> {
-  const tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'moicons-'));
-  const srcPng = path.join(tmp, 'icon_1024.png');
-  await fs.writeFile(srcPng, Buffer.from(imageData));
-  try {
-    await fs.mkdir(iconsetDir, { recursive: true });
-    for (const [name, size] of ICON_SIZES) {
-      await run(
-        `sips -z ${size} ${size} "${srcPng}" --out "${path.join(iconsetDir, name)}"`,
-      );
-    }
-    await run(`iconutil -c icns "${iconsetDir}" --output "${icnsPath}"`);
-  } finally {
-    await fs.rm(tmp, { recursive: true, force: true });
-  }
-}
+const GITHUB_REPOSITORY_URL = 'https://github.com/caezium/sidekick-illustrator';
 
 async function showAboutDialog() {
   const result = await app.showMessageDialog({
@@ -226,13 +151,13 @@ app.setMenu(appMenu)
 // Window
 // ---------------------------------------------------------------------------
 
-let hasUnsavedIcon = false;
+let hasUnsavedIllustration = false;
 
-// Create the main app window.
+// Create the main app window. Wider/taller than the icon app to fit 16:9 art.
 const win = new BrowserWindow({
   url: app.url,
-  size: { width: 550, height: 520 },
-  resizable: false,
+  size: { width: 720, height: 640 },
+  resizable: true,
   windowTitleVisible: false,
   windowTitlebarVisible: false,
   windowButtonPosition: { x: 20, y: 20 },
@@ -245,7 +170,7 @@ win.centerWindow();
 win.show();
 
 win.handle('close', async () => {
-  if (!hasUnsavedIcon) {
+  if (!hasUnsavedIllustration) {
     return 'close';
   }
   const result = await app.showMessageDialog({
@@ -253,7 +178,7 @@ win.handle('close', async () => {
     type: 'warning',
     title: 'Quit without saving?',
     message:
-      'Your icon has not been saved. If you quit now, it will be lost.',
+      'Your illustration has not been saved. If you quit now, it will be lost.',
     buttons: [
       { label: 'Cancel', type: 'secondary' },
       { label: 'Quit Anyway', type: 'primary' },
@@ -276,61 +201,37 @@ ipc.registerService(AppServiceDescriptor, {
   },
 
   async SetUnsavedIconState(request: SetUnsavedIconStateRequest) {
-    hasUnsavedIcon = request.unsaved;
+    hasUnsavedIllustration = request.unsaved;
     return {};
   },
 
   async SaveIcon(request: SaveIconRequest): Promise<SaveIconResponse> {
-    let saveDialogDefault = path.join(app.getPath('userHome'), 'Desktop', 'app.icns');
+    const pick = await app.showSaveDialog({
+      parentWindow: win,
+      title: 'Save illustration',
+      buttonLabelSave: 'Save',
+      defaultPath: path.join(app.getPath('userHome'), 'Desktop', 'illustration.png'),
+      filters: [{ name: 'PNG image', extensions: ['png'] }],
+      features: { canCreateDirectories: true },
+    });
 
-    for (;;) {
-      const pick = await app.showSaveDialog({
-        parentWindow: win,
-        title: 'Save icon',
-        buttonLabelSave: 'Save',
-        defaultPath: saveDialogDefault,
-        filters: [{ name: 'macOS icon', extensions: ['icns'] }],
-        features: { canCreateDirectories: true },
-      });
+    if (pick.canceled || !pick.path) {
+      return { savedPath: '', canceled: true, imagePath: '' };
+    }
 
-      if (pick.canceled || !pick.path) {
-        return { savedPath: '', canceled: true, icnsPath: '' };
-      }
+    // Guarantee a .png extension.
+    let target = path.resolve(pick.path);
+    if (path.extname(target).toLowerCase() !== '.png') {
+      target = `${target}.png`;
+    }
 
-      const { parentDir, icnsPath, iconsetDir } = resolveSaveTargets(pick.path);
-
-      if (await icnsOutputsExist(icnsPath, iconsetDir)) {
-        const names = `${path.basename(icnsPath)}\n${path.basename(iconsetDir)}`;
-        const confirm = await app.showMessageDialog({
-          parentWindow: win,
-          type: 'warning',
-          title: 'Already exists',
-          message:
-            `A file or folder with this name is already in the destination folder:\n\n${names}\n\n` +
-            'Replace them, or choose another name or folder.',
-          buttons: [
-            { label: 'Cancel', type: 'secondary' },
-            { label: 'Choose Different…', type: 'regular' },
-            { label: 'Replace', type: 'primary' },
-          ],
-        });
-
-        if (confirm.button.type === 'primary') {
-          await removeIcnsOutputs(icnsPath, iconsetDir);
-          await buildIcnsAt(request.imageData, iconsetDir, icnsPath);
-          hasUnsavedIcon = false;
-          return { savedPath: parentDir, canceled: false, icnsPath };
-        }
-        if (confirm.button.type === 'regular') {
-          saveDialogDefault = icnsPath;
-          continue;
-        }
-        return { savedPath: '', canceled: true, icnsPath: '' };
-      }
-
-      await buildIcnsAt(request.imageData, iconsetDir, icnsPath);
-      hasUnsavedIcon = false;
-      return { savedPath: parentDir, canceled: false, icnsPath };
+    try {
+      await fs.writeFile(target, Buffer.from(request.imageData));
+      hasUnsavedIllustration = false;
+      return { savedPath: path.dirname(target), canceled: false, imagePath: target };
+    } catch {
+      // No error channel on this response; report as a non-save.
+      return { savedPath: '', canceled: false, imagePath: '' };
     }
   },
 
@@ -357,8 +258,8 @@ ipc.registerService(AppServiceDescriptor, {
     // sandboxed renderer.
     const pick = await app.showOpenDialog({
       parentWindow: win,
-      title: 'Choose reference image',
-      buttonLabelOpen: 'Attach',
+      title: 'Choose image',
+      buttonLabelOpen: 'Choose',
       selectionPolicy: 'files',
       filters: [
         { name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif'] },
@@ -393,13 +294,35 @@ ipc.registerService(AppServiceDescriptor, {
     }
   },
 
+  async SetAvatar(request: SetAvatarRequest): Promise<SetAvatarResponse> {
+    const b64 = request.imageB64.trim();
+    if (!b64) {
+      return { error: 'No image data.' };
+    }
+    if (!setAvatar(b64, request.mime)) {
+      return { error: 'Could not save the avatar to disk.' };
+    }
+    return { error: '' };
+  },
+
+  async GetAvatar(_request: GetAvatarRequest): Promise<GetAvatarResponse> {
+    return {
+      imageB64: getAvatarB64(),
+      mime: getAvatarMime(),
+      hasAvatar: hasAvatar(),
+    };
+  },
+
   async GenerateIcon(request: GenerateIconRequest): Promise<GenerateIconResponse> {
     try {
       const { positive, negative } = buildPrompt(request.prompt);
+      // The avatar is the persistent reference character; a per-generation
+      // reference image (if the user attached one) takes precedence.
+      const reference = request.referenceImage || getAvatarB64() || undefined;
       const result = await getProvider().generate({
         positivePrompt: positive,
         negativePrompt: negative,
-        referenceImageB64: request.referenceImage || undefined,
+        referenceImageB64: reference,
         count: 3,
       });
       return { images: result.images, error: '' };

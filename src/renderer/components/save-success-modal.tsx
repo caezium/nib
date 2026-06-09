@@ -4,11 +4,11 @@ import { ipc } from "@/gen/ipc"
 
 export function SaveSuccessModal({
   folderPath,
-  icnsPath,
+  imagePath,
   onClose,
 }: {
   folderPath: string
-  icnsPath: string
+  imagePath: string
   onClose: () => void
 }) {
   useEffect(() => {
@@ -20,7 +20,7 @@ export function SaveSuccessModal({
   }, [onClose])
 
   const openInFinder = () => {
-    ipc.app.ShowPathInFinder({ path: icnsPath }).catch(() => {})
+    ipc.app.ShowPathInFinder({ path: imagePath }).catch(() => {})
   }
 
   return (
@@ -33,7 +33,7 @@ export function SaveSuccessModal({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-border">
-          <span className="text-sm font-medium text-foreground">Icon saved</span>
+          <span className="text-sm font-medium text-foreground">Illustration saved</span>
           <button
             onClick={onClose}
             className="flex items-center justify-center w-6 h-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-white/10 transition-colors"
@@ -44,12 +44,11 @@ export function SaveSuccessModal({
 
         <div className="px-4 py-3 space-y-2">
           <p className="text-sm text-muted-foreground leading-relaxed">
-            Your icon was saved as{" "}
+            Your illustration was saved as{" "}
             <span className="text-foreground font-medium">
-              {icnsPath.replace(/^.*[/\\]/, "") || "app.icns"}
+              {imagePath.replace(/^.*[/\\]/, "") || "illustration.png"}
             </span>{" "}
-            in the folder below. A <span className="text-foreground font-medium">.iconset</span> folder
-            with the same base name was created next to it. You can open the file in Finder from here.
+            in the folder below. You can open it in Finder from here.
           </p>
           <pre
             className="text-xs font-mono text-foreground/80 whitespace-pre-wrap break-all rounded-lg bg-secondary/40 px-3 py-2 max-h-36 overflow-y-auto select-text"

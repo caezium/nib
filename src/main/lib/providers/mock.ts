@@ -77,7 +77,7 @@ export class MockImageProvider implements ImageProvider {
     if (!mockProviderLogged) {
       mockProviderLogged = true;
       console.warn(
-        "[MōIcons] Mock image provider is active (no paid API calls). " +
+        "[Sidekick] Mock image provider is active (no paid API calls). " +
           "Unset ICON_PROVIDER or set ICON_PROVIDER=openai for real generation.",
       );
     }

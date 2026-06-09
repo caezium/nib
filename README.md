@@ -1,73 +1,53 @@
-# MōIcons — create app icons for macOS
+# Sidekick
 
-A simple desktop app for generating **macOS app icons** in the `*.icns` format with AI. You describe what you want, optionally attach a reference image, pick from several variants, refine the chosen design, then save a proper `*.icns` bundle and the `*.iconset` folder with all standard sizes.
+Turn any idea into a **white-background, hand-drawn 16:9 illustration starring your own avatar.**
 
-This app uses the [OpenAI API](https://openai.com/api/) for image generation.
+Sidekick is a small desktop app: bring your own character (a mascot, a logo
+character, any avatar), type a concept, and get a clean explanatory illustration
+in a consistent house style — your character *doing* the core action, not just
+decorating the scene.
 
-Here's a short video demonstrating the app in action:
+It's a [MōBrowser](https://teamdev.com/mobrowser/) (TypeScript + React) desktop
+app, repurposed from an app-icon generator.
 
-https://github.com/user-attachments/assets/1c87f99d-993f-408b-bd32-a1eb6552eada
+## How it works
 
-## What it does
+1. **Add your avatar** (first run) — one image of your character. It's fed as the
+   reference for every generation, so the character stays recognizable.
+2. **Add an API key** — OpenAI (`sk-…`) **or** OpenRouter (`sk-or-…`). The
+   provider is chosen automatically from the key shape.
+3. **Describe an idea** — e.g. *"trust is built one piece of evidence at a time."*
+   You get three 16:9 variants; pick one, refine it, and **save a PNG**.
 
-- **Prompt-based generation.** Your text is wrapped in fixed system constraints, so outputs stay on-brand for macOS-style icons (centered subject, no text, squircle-friendly composition, etc.).
-- **Three variants per run.** Each generation returns three images, so you can compare quickly.
-- **Optional reference image.** Attach a PNG to steer the model (for example a sketch, logo, or earlier render).
-- **Refine workflow.** After you confirm one variant, you can run more generations that treat that icon as the reference until you are happy with the result.
-- **Preview.** The UI shows icons with a squircle mask for a realistic preview. 
-- **Export & Save.** The saved **`.icns`** uses full-bleed artwork, so macOS can apply its own mask (avoiding the gray plate and shrunken icon you get from pre-clipped corners).
+Optionally attach a one-off reference image (button or ⌘V paste) for a single
+generation.
 
-Quitting with an unsaved icon triggers a confirmation dialog.
+## Style
 
-## Requirements
+White background, generous whitespace, one idea per image, chunky hand-drawn
+outlines, restrained warm palette with small red/orange/blue/mint accents, and a
+few short handwritten labels at most. The character always performs the central
+action. The full "house style" lives in `src/main/lib/prompt-builder.ts`.
 
-- macOS 14 (Apple Silicon) or later.
-- [Node.js](https://nodejs.org/en/download/) 24.14.1 (LTS) or later.
-- [MōBrowser](https://teamdev.com/mobrowser/) 2.7.1 or later.
+## Run it
 
-## Setup
-
-```bash
-npm install
+```sh
+npm run gen        # generate IPC bindings from the proto (first time)
+npm run dev        # real generation (needs an OpenAI or OpenRouter key)
+npm run dev:mock   # placeholder images, no API calls
+npm run build      # package a desktop app
 ```
 
-## Run
+## Providers
 
-To run the app in development mode:
+- **OpenAI** — `gpt-image-1`, landscape `1536×1024`, reference via `/images/edits`.
+- **OpenRouter** — `google/gemini-2.5-flash-image` (override with `OPENROUTER_MODEL`),
+  `aspect_ratio: 16:9`, via chat-completions image output.
 
-```bash
-npm run dev
-```
+The active provider is inferred from the saved key; `ICON_PROVIDER=mock|openai|openrouter`
+overrides it.
 
-For local UI work without APIs:
+## Status
 
-```bash
-npm run dev:mock
-```
-
-## Build
-
-To build the app for production:
-
-```bash
-npm run build
-```
-
-## How to use the app
-
-1. **Describe the icon** in the prompt field (short phrases work well: e.g. “blue clipboard with folded corner”).
-2. **Optional:** attach a **reference image** to influence layout or style.
-3. Press **Generate** (or **Enter**). Wait for **three** previews.
-4. **Pick a variant** to move into refine mode, or generate again from scratch.
-5. In **refine** mode, adjust the prompt and generate again; the confirmed icon is used as reference for the next batch.
-6. When satisfied, click **Save**. Choose a **`.icns`** path; the app writes **`YourName.icns`** and **`YourName.iconset`** in that folder (replacing existing files only if you confirm).
-7. Use **Reveal in Finder** from the success UI if you want to open the save location.
-
-## Project layout
-
-- **`src/main/`** — window, IPC, prompt building, provider selection, **`icns`** assembly.
-- **`src/renderer/`** — React UI, squircle preview, generation pipeline state.
-
-## Download
-
-You can download the app from the [releases page](https://github.com/mo-browser-apps/icons/releases). All releases are signed and notarized by Apple.
+MVP. Single concept → illustration works end to end. Next: paste an article →
+auto shot-list → batch generate.
