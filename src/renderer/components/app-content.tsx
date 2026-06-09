@@ -10,6 +10,7 @@ import { PromptInput, type PrimaryAction } from "@/components/prompt-input"
 import { ErrorModal, generationErrorSuggestsApiKeyIssue } from "@/components/error-modal"
 import { SaveSuccessModal } from "@/components/save-success-modal"
 import { AvatarSetupModal } from "@/components/avatar-setup-modal"
+import { ArticlePanel } from "@/components/article-panel"
 import { TitleBarStatus } from "@/components/title-bar-status"
 import type { IconState } from "@/components/icon-types"
 import { useIconPipeline } from "@/lib/icon-pipeline"
@@ -37,6 +38,8 @@ export function AppContent() {
   // Avatar gate: the persistent reference character. Blocking on first run.
   const [avatarReady, setAvatarReady] = useState(false)
   const [avatarModal, setAvatarModal] = useState<"setup" | "settings" | null>(null)
+  // Single-concept vs whole-article batch mode.
+  const [mode, setMode] = useState<"concept" | "article">("concept")
   const resumeAfterCancelRef = useRef<ResumeAfterCancel>("idle")
 
   const pipeline = useIconPipeline()
@@ -264,52 +267,81 @@ export function AppContent() {
         />
       )}
 
-      {/* Save button — top right corner. */}
-      <div className="absolute top-3 right-3 z-50">
-        <button
-          disabled={!canSave}
-          onClick={handleSave}
-          className={cn(
-            "flex items-center gap-2 px-4 h-8 rounded-lg text-sm font-medium transition-all duration-200 non-draggable",
-            canSave
-              ? "bg-primary text-primary-foreground hover:bg-primary/90 active:scale-[0.97] shadow-md"
-              : "bg-secondary/30 text-muted-foreground/40 cursor-not-allowed"
-          )}
-        >
-          <Download className="w-3.5 h-3.5" />
-          Save
-        </button>
+      {/* Mode toggle — top center. */}
+      <div className="absolute top-3 left-1/2 -translate-x-1/2 z-50 non-draggable">
+        <div className="flex items-center gap-0.5 rounded-lg bg-secondary/50 p-0.5 text-xs">
+          {(["concept", "article"] as const).map((m) => (
+            <button
+              key={m}
+              type="button"
+              onClick={() => setMode(m)}
+              className={cn(
+                "px-3 h-7 rounded-md font-medium transition-colors capitalize",
+                mode === m
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {m}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {/* Icon preview — pinned to top, centered horizontally. */}
-      <div className="flex justify-center pt-28 pb-20 px-10">
-        <MacOSIcon
-          state={iconState}
-          selected={selectedVariant}
-          onSelect={setSelectedVariant}
-          variants={pipeline.variants}
-          baseIconSrc={baseIconSrc}
-        />
-      </div>
+      {/* Save button — top right corner (concept mode only; article cards save individually). */}
+      {mode === "concept" && (
+        <div className="absolute top-3 right-3 z-50">
+          <button
+            disabled={!canSave}
+            onClick={handleSave}
+            className={cn(
+              "flex items-center gap-2 px-4 h-8 rounded-lg text-sm font-medium transition-all duration-200 non-draggable",
+              canSave
+                ? "bg-primary text-primary-foreground hover:bg-primary/90 active:scale-[0.97] shadow-md"
+                : "bg-secondary/30 text-muted-foreground/40 cursor-not-allowed"
+            )}
+          >
+            <Download className="w-3.5 h-3.5" />
+            Save
+          </button>
+        </div>
+      )}
 
-      {/* Bottom area — input, pushed to the bottom. */}
-      <div className="flex flex-1 flex-col items-center justify-end gap-6 px-4 pb-4">
-        <PromptInput
-          value={prompt}
-          onChange={setPrompt}
-          primaryAction={primaryAction}
-          onPrimary={onPrimary}
-          primaryEnabled={primaryEnabled}
-          onRegenerate={primaryAction === "select" ? startGeneration : undefined}
-          regenerateEnabled={prompt.trim().length > 0}
-          inputDisabled={iconState === "generating"}
-          placeholder={inputPlaceholder}
-          attachments={attachments}
-          onAttachmentsChange={setAttachments}
-          onOpenApiKeySettings={() => setOpenAIApiKeyManageReason("settings")}
-          onOpenAvatarSettings={() => setAvatarModal("settings")}
-        />
-      </div>
+      {mode === "concept" ? (
+        <>
+          {/* Illustration preview — pinned to top, centered horizontally. */}
+          <div className="flex justify-center pt-28 pb-20 px-10">
+            <MacOSIcon
+              state={iconState}
+              selected={selectedVariant}
+              onSelect={setSelectedVariant}
+              variants={pipeline.variants}
+              baseIconSrc={baseIconSrc}
+            />
+          </div>
+
+          {/* Bottom area — input, pushed to the bottom. */}
+          <div className="flex flex-1 flex-col items-center justify-end gap-6 px-4 pb-4">
+            <PromptInput
+              value={prompt}
+              onChange={setPrompt}
+              primaryAction={primaryAction}
+              onPrimary={onPrimary}
+              primaryEnabled={primaryEnabled}
+              onRegenerate={primaryAction === "select" ? startGeneration : undefined}
+              regenerateEnabled={prompt.trim().length > 0}
+              inputDisabled={iconState === "generating"}
+              placeholder={inputPlaceholder}
+              attachments={attachments}
+              onAttachmentsChange={setAttachments}
+              onOpenApiKeySettings={() => setOpenAIApiKeyManageReason("settings")}
+              onOpenAvatarSettings={() => setAvatarModal("settings")}
+            />
+          </div>
+        </>
+      ) : (
+        <ArticlePanel />
+      )}
     </div>
   )
 }

@@ -10,6 +10,8 @@ import {
   GetOpenAIApiKeyStatusResponse,
   GetStoredOpenAIApiKeyRequest,
   GetStoredOpenAIApiKeyResponse,
+  MakeShotListRequest,
+  MakeShotListResponse,
   OpenExternalUrlRequest,
   PickReferenceImageRequest,
   PickReferenceImageResponse,
@@ -37,6 +39,7 @@ import {
   hasAvatar,
   setAvatar,
 } from './lib/avatar-store';
+import { makeShotList } from './lib/shot-list';
 
 const GITHUB_REPOSITORY_URL = 'https://github.com/caezium/sidekick-illustrator';
 
@@ -319,16 +322,34 @@ ipc.registerService(AppServiceDescriptor, {
       // The avatar is the persistent reference character; a per-generation
       // reference image (if the user attached one) takes precedence.
       const reference = request.referenceImage || getAvatarB64() || undefined;
+      const count = request.variantCount > 0 ? request.variantCount : 3;
       const result = await getProvider().generate({
         positivePrompt: positive,
         negativePrompt: negative,
         referenceImageB64: reference,
-        count: 3,
+        count,
       });
       return { images: result.images, error: '' };
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       return { images: [], error: message };
+    }
+  },
+
+  async MakeShotList(request: MakeShotListRequest): Promise<MakeShotListResponse> {
+    try {
+      const shots = await makeShotList(request.article);
+      return {
+        shots: shots.map((s) => ({
+          theme: s.theme,
+          coreIdea: s.coreIdea,
+          labels: s.labels,
+        })),
+        error: '',
+      };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return { shots: [], error: message };
     }
   },
 

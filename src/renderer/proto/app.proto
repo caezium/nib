@@ -36,6 +36,8 @@ message GenerateIconRequest {
   string reference_image = 3;
   // Seed for reproducibility. 0 = pick automatically.
   int32 seed = 4;
+  // Number of variants to generate. 0 = default (3). Batch mode passes 1.
+  int32 variant_count = 5;
 }
 
 message GenerateIconResponse {
@@ -110,6 +112,27 @@ message GetAvatarResponse {
   bool has_avatar = 3;
 }
 
+// --- Article -> shot list (text LLM) ---
+
+message Shot {
+  // 2-4 word title for the illustration.
+  string theme = 1;
+  // One sentence: the idea to visualize.
+  string core_idea = 2;
+  // 0-3 very short words suggested as handwritten labels.
+  repeated string labels = 3;
+}
+
+message MakeShotListRequest {
+  string article = 1;
+}
+
+message MakeShotListResponse {
+  repeated Shot shots = 1;
+  // Empty on success; otherwise a short error message for the user.
+  string error = 2;
+}
+
 service AppService {
   rpc SetTheme(SetThemeRequest) returns (google.protobuf.Empty);
   rpc SetUnsavedIconState(SetUnsavedIconStateRequest) returns (google.protobuf.Empty);
@@ -123,4 +146,5 @@ service AppService {
   rpc PickReferenceImage(PickReferenceImageRequest) returns (PickReferenceImageResponse);
   rpc SetAvatar(SetAvatarRequest) returns (SetAvatarResponse);
   rpc GetAvatar(GetAvatarRequest) returns (GetAvatarResponse);
+  rpc MakeShotList(MakeShotListRequest) returns (MakeShotListResponse);
 }

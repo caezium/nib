@@ -93,6 +93,7 @@ export function useIconPipeline(): IconPipeline {
         negativePrompt: "",
         referenceImage,
         seed: 0,
+        variantCount: 0, // 0 = default (3)
       })
 
       if (cancelledRef.current) {
