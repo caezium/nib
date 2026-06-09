@@ -29,9 +29,11 @@ function pngChunk(type: string, data: Buffer): Buffer {
   return Buffer.concat([len, t, data, crc]);
 }
 
-function rgba1024PngBuffer(r: number, g: number, b: number, a: number): Buffer {
-  const width = 1024;
-  const height = 1024;
+function rgbaPngBuffer(r: number, g: number, b: number, a: number): Buffer {
+  // Small 16:9 placeholder — matches the app's output aspect and keeps the
+  // transient buffer tiny (vs a 4 MB 1024² square).
+  const width = 768;
+  const height = 432;
   const row = Buffer.alloc(1 + width * 4);
   row[0] = 0;
   for (let x = 0; x < width; x++) {
@@ -90,7 +92,7 @@ export class MockImageProvider implements ImageProvider {
     for (let i = 0; i < n; i++) {
       const [rv, gv, bv] = VARIANT_COLORS[i % VARIANT_COLORS.length]!;
       const tweak = Math.min(40, i * 8);
-      const buf = rgba1024PngBuffer(
+      const buf = rgbaPngBuffer(
         Math.min(255, rv + tweak),
         Math.min(255, gv + tweak / 2),
         Math.max(0, bv - tweak / 3),
