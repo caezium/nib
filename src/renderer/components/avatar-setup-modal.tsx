@@ -3,6 +3,38 @@ import { ImagePlus, X } from "lucide-react"
 import { ipc } from "@/gen/ipc"
 import { cn } from "@/lib/utils"
 
+/** Cap the avatar's longest edge so prefs, API payloads, and decode stay small. */
+const MAX_AVATAR_PX = 1024
+
+async function downscaleAvatar(
+  b64: string,
+  mime: string
+): Promise<{ b64: string; mime: string }> {
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const im = new Image()
+      im.onload = () => resolve(im)
+      im.onerror = () => reject(new Error("decode failed"))
+      im.src = `data:${mime};base64,${b64}`
+    })
+    const scale = Math.min(1, MAX_AVATAR_PX / Math.max(img.width, img.height))
+    if (scale >= 1) return { b64, mime } // already small enough
+    const w = Math.max(1, Math.round(img.width * scale))
+    const h = Math.max(1, Math.round(img.height * scale))
+    const canvas = document.createElement("canvas")
+    canvas.width = w
+    canvas.height = h
+    const ctx = canvas.getContext("2d")
+    if (!ctx) return { b64, mime }
+    ctx.drawImage(img, 0, 0, w, h)
+    const out = canvas.toDataURL("image/png")
+    const comma = out.indexOf(",")
+    return { b64: comma >= 0 ? out.slice(comma + 1) : out, mime: "image/png" }
+  } catch {
+    return { b64, mime } // fall back to the original on any failure
+  }
+}
+
 /**
  * "Add your avatar" — the persistent reference character every illustration
  * stars. Blocking on first run (no `onClose`); editable later from settings
@@ -44,8 +76,9 @@ export function AvatarSetupModal({
         return
       }
       if (res.imageB64) {
-        setImageB64(res.imageB64)
-        setMime(res.mime || "image/png")
+        const scaled = await downscaleAvatar(res.imageB64, res.mime || "image/png")
+        setImageB64(scaled.b64)
+        setMime(scaled.mime)
       }
     } catch {
       setError("Could not open the file picker.")
