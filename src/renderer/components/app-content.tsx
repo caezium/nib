@@ -38,6 +38,8 @@ export function AppContent() {
   // Avatar gate: the persistent reference character. Blocking on first run.
   const [avatarReady, setAvatarReady] = useState(false)
   const [avatarModal, setAvatarModal] = useState<"setup" | "settings" | null>(null)
+  // True when the mock provider is active (placeholder images, no API calls).
+  const [mockMode, setMockMode] = useState(false)
   // Single-concept vs whole-article batch mode.
   const [mode, setMode] = useState<"concept" | "article">("concept")
   const resumeAfterCancelRef = useRef<ResumeAfterCancel>("idle")
@@ -57,6 +59,8 @@ export function AppContent() {
         }
         const required = resp.openaiKeyRequired ?? resp.openai_key_required
         const hasKey = resp.hasOpenaiKey ?? resp.has_openai_key
+        // A key is required for every real provider; only mock needs none.
+        setMockMode(required === false)
         if (required === true && hasKey !== true) {
           setOpenAIApiKeyStartupOpen(true)
         }
@@ -257,6 +261,15 @@ export function AppContent() {
 
       {/* macOS traffic-light spacer (also serves as the drag region). */}
       <div className="draggable" />
+
+      {/* Mock-mode badge — placeholder images, no API calls. */}
+      {mockMode && (
+        <div className="absolute top-3 left-24 z-50 non-draggable">
+          <span className="inline-flex items-center h-6 px-2 rounded-md text-[11px] font-medium bg-amber-500/15 text-amber-400 border border-amber-500/30">
+            Mock mode · placeholder images
+          </span>
+        </div>
+      )}
 
       {/* Compact title-bar status: progress line + label. */}
       {showStatus && (
