@@ -11,6 +11,7 @@ import { ErrorModal, generationErrorSuggestsApiKeyIssue } from "@/components/err
 import { SaveSuccessModal } from "@/components/save-success-modal"
 import { AvatarSetupModal } from "@/components/avatar-setup-modal"
 import { ArticlePanel } from "@/components/article-panel"
+import { StylePicker, type StyleOption } from "@/components/style-picker"
 import { TitleBarStatus } from "@/components/title-bar-status"
 import type { IconState } from "@/components/icon-types"
 import { useIconPipeline } from "@/lib/icon-pipeline"
@@ -42,6 +43,9 @@ export function AppContent() {
   const [mockMode, setMockMode] = useState(false)
   // Single-concept vs whole-article batch mode.
   const [mode, setMode] = useState<"concept" | "article">("concept")
+  // Look library + current selection.
+  const [styles, setStyles] = useState<StyleOption[]>([])
+  const [selectedStyle, setSelectedStyle] = useState("")
   const resumeAfterCancelRef = useRef<ResumeAfterCancel>("idle")
 
   const pipeline = useIconPipeline()
@@ -73,6 +77,15 @@ export function AppContent() {
       .then((r) => {
         setAvatarReady(r.hasAvatar)
         if (!r.hasAvatar) setAvatarModal("setup")
+      })
+      .catch(() => {})
+
+    // Look library.
+    ipc.app
+      .GetStyles({})
+      .then((r) => {
+        setStyles(r.styles)
+        if (r.styles.length > 0) setSelectedStyle((cur) => cur || r.styles[0].id)
       })
       .catch(() => {})
   }, [])
@@ -125,7 +138,7 @@ export function AppContent() {
     // In refine mode the confirmed variant is the reference; otherwise use the
     // user-attached image (if any).
     const referenceImage = iconState === "refine" ? (baseIconSrc ?? attachments[0]) : attachments[0]
-    pipeline.generate(prompt, referenceImage)
+    pipeline.generate(prompt, referenceImage, selectedStyle)
   }
 
   const stopGeneration = () => {
@@ -333,8 +346,14 @@ export function AppContent() {
             />
           </div>
 
-          {/* Bottom area — input, pushed to the bottom. */}
-          <div className="flex flex-1 flex-col items-center justify-end gap-6 px-4 pb-4">
+          {/* Bottom area — style picker + input, pushed to the bottom. */}
+          <div className="flex flex-1 flex-col items-center justify-end gap-3 px-4 pb-4">
+            <StylePicker
+              styles={styles}
+              value={selectedStyle}
+              onChange={setSelectedStyle}
+              disabled={iconState === "generating"}
+            />
             <PromptInput
               value={prompt}
               onChange={setPrompt}
@@ -353,7 +372,7 @@ export function AppContent() {
           </div>
         </>
       ) : (
-        <ArticlePanel />
+        <ArticlePanel style={selectedStyle} styles={styles} onStyleChange={setSelectedStyle} />
       )}
     </div>
   )

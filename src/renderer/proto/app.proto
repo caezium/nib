@@ -38,6 +38,19 @@ message GenerateIconRequest {
   int32 seed = 4;
   // Number of variants to generate. 0 = default (3). Batch mode passes 1.
   int32 variant_count = 5;
+  // Look id (see GetStyles). Empty = default look.
+  string style = 6;
+}
+
+message StyleInfo {
+  string id = 1;
+  string label = 2;
+}
+
+message GetStylesRequest {}
+
+message GetStylesResponse {
+  repeated StyleInfo styles = 1;
 }
 
 message GenerateIconResponse {
@@ -147,4 +160,5 @@ service AppService {
   rpc SetAvatar(SetAvatarRequest) returns (SetAvatarResponse);
   rpc GetAvatar(GetAvatarRequest) returns (GetAvatarResponse);
   rpc MakeShotList(MakeShotListRequest) returns (MakeShotListResponse);
+  rpc GetStyles(GetStylesRequest) returns (GetStylesResponse);
 }

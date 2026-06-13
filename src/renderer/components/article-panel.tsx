@@ -2,6 +2,7 @@ import { useCallback, useState } from "react"
 import { Download, ImageIcon, Loader2, RefreshCw, Sparkles } from "lucide-react"
 import { ipc } from "@/gen/ipc"
 import type { Shot } from "@/gen/app"
+import { StylePicker, type StyleOption } from "@/components/style-picker"
 import { cn } from "@/lib/utils"
 
 type ShotResult = {
@@ -16,7 +17,15 @@ function shotPrompt(shot: Shot): string {
   return `${shot.coreIdea}${labels}`
 }
 
-export function ArticlePanel() {
+export function ArticlePanel({
+  style,
+  styles,
+  onStyleChange,
+}: {
+  style: string
+  styles: StyleOption[]
+  onStyleChange: (id: string) => void
+}) {
   const [article, setArticle] = useState("")
   const [shots, setShots] = useState<Shot[]>([])
   const [planning, setPlanning] = useState(false)
@@ -61,6 +70,7 @@ export function ArticlePanel() {
           referenceImage: "", // main falls back to the stored avatar
           seed: 0,
           variantCount: 1,
+          style,
         })
         if (res.error || res.images.length === 0) {
           setResult(i, { status: "error", image: null })
@@ -71,7 +81,7 @@ export function ArticlePanel() {
         setResult(i, { status: "error", image: null })
       }
     },
-    [shots, setResult]
+    [shots, setResult, style]
   )
 
   const generateAll = useCallback(async () => {
@@ -105,6 +115,11 @@ export function ArticlePanel() {
 
   return (
     <div className="flex flex-col h-full w-full max-w-[680px] mx-auto px-4 pt-20 pb-4 gap-3 overflow-hidden">
+      {/* Style picker — applies to every shot. */}
+      <div className="shrink-0">
+        <StylePicker styles={styles} value={style} onChange={onStyleChange} disabled={batchRunning} />
+      </div>
+
       {/* Article input */}
       {!hasShots && (
         <>

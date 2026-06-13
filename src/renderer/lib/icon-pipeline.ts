@@ -28,7 +28,7 @@ export interface IconPipeline {
    * saved exactly as generated (no masking), so the two are identical.
    */
   rawVariants: (string | null)[]
-  generate: (prompt: string, referenceDataUrl?: string) => void
+  generate: (prompt: string, referenceDataUrl?: string, style?: string) => void
   cancel: () => void
 }
 
@@ -65,7 +65,7 @@ export function useIconPipeline(): IconPipeline {
     cancelledRef.current = true
   }, [])
 
-  const generate = useCallback(async (prompt: string, referenceDataUrl?: string) => {
+  const generate = useCallback(async (prompt: string, referenceDataUrl?: string, style?: string) => {
     cancelledRef.current = false
     setVariants([null, null, null])
     setRawVariants([null, null, null])
@@ -94,6 +94,7 @@ export function useIconPipeline(): IconPipeline {
         referenceImage,
         seed: 0,
         variantCount: 0, // 0 = default (3)
+        style: style ?? "",
       })
 
       if (cancelledRef.current) {

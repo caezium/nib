@@ -10,6 +10,8 @@ import {
   GetOpenAIApiKeyStatusResponse,
   GetStoredOpenAIApiKeyRequest,
   GetStoredOpenAIApiKeyResponse,
+  GetStylesRequest,
+  GetStylesResponse,
   MakeShotListRequest,
   MakeShotListResponse,
   OpenExternalUrlRequest,
@@ -27,6 +29,7 @@ import {
 } from './gen/app';
 import { AppServiceDescriptor } from './gen/ipc_service';
 import { buildPrompt } from './lib/prompt-builder';
+import { styleList } from './lib/styles';
 import { getProvider, resolveProviderName } from './lib/image-provider';
 import {
   getResolvedApiKey,
@@ -318,7 +321,7 @@ ipc.registerService(AppServiceDescriptor, {
 
   async GenerateIcon(request: GenerateIconRequest): Promise<GenerateIconResponse> {
     try {
-      const { positive, negative } = buildPrompt(request.prompt);
+      const { positive, negative } = buildPrompt(request.prompt, request.style);
       // The avatar is the persistent reference character; a per-generation
       // reference image (if the user attached one) takes precedence.
       const reference = request.referenceImage || getAvatarB64() || undefined;
@@ -334,6 +337,10 @@ ipc.registerService(AppServiceDescriptor, {
       const message = err instanceof Error ? err.message : String(err);
       return { images: [], error: message };
     }
+  },
+
+  async GetStyles(_request: GetStylesRequest): Promise<GetStylesResponse> {
+    return { styles: styleList() };
   },
 
   async MakeShotList(request: MakeShotListRequest): Promise<MakeShotListResponse> {

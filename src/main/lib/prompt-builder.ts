@@ -1,36 +1,35 @@
+import { resolveStyle } from "./styles";
+
 /**
- * System-level style constraints prepended to every illustration request.
- *
- * This is the "house style": a white-background, hand-drawn, lightly-pixelated
- * explanatory illustration in which the user's own avatar (supplied as a
- * reference image) performs the core conceptual action. The avatar's *identity*
- * comes from the reference image; this prefix only fixes the *style* and the
- * rule that the avatar must drive the action — so it works for any avatar.
- *
- * Keep entropy low (few adjectives, strict rules) for consistent output.
+ * The house "methodology" — constant across every style. The avatar's identity
+ * comes from the reference image; this fixes the rules of the picture. The
+ * rendering *look* is supplied separately by the selected style (see styles.ts).
  */
-const STYLE_PREFIX =
-  "One standalone 16:9 horizontal article illustration. " +
-  "Pure white background, generous empty white space, ONE single core idea. " +
-  "Soft hand-drawn explanatory style: chunky, slightly imperfect dark-brown outlines, " +
-  "lightly pixelated edges, restrained warm palette with occasional red / orange / blue / mint accents. " +
-  "Low-tech tactile props only (boxes, tubes, buckets, pulleys, boards, bridges, funnels, levers, wires, carts). " +
-  "The recurring IP character is the avatar shown in the reference image — keep it clearly recognizable and " +
-  "consistent in shape, color, and proportions, and it MUST perform the core conceptual action " +
-  "(pushing, sorting, steering, building, holding, fishing, patching, balancing, arranging), not merely decorate the scene. " +
-  "Invent a fresh physical metaphor for this specific idea; do not reuse bridge / funnel / roadmap by default. " +
-  "Main subject ~40-60% of the canvas. " +
-  "0-5 very short handwritten labels (1-4 words each) only when useful; no title; never write the structure type on the image.";
+const BASE_METHODOLOGY =
+  "One standalone 16:9 horizontal illustration on a pure white background. " +
+  "Express ONE single idea with generous empty white space. " +
+  "The recurring character shown in the reference image is the subject and MUST " +
+  "physically perform the idea (pushing, sorting, steering, building, holding, " +
+  "fishing, patching, balancing, arranging) — never decoration; keep it clearly " +
+  "recognizable and consistent in shape, color, and proportions. " +
+  "Invent a fresh, concrete physical metaphor for this specific idea; do not " +
+  "default to bridge / funnel / roadmap. Use simple low-tech tactile props " +
+  "(boxes, tubes, buckets, pulleys, boards, levers, carts, wires). " +
+  "Keep the main subject around 40-60% of the canvas. " +
+  "At most a few very short handwritten labels (1-4 words each), only when useful; " +
+  "no title; never write the structure name on the image. " +
+  "It is not a photo, not a logo, not a corporate infographic, not a formal " +
+  "flowchart, and not a UI mockup.";
 
 /**
  * Things to steer away from. OpenAI / gemini image models rely mainly on the
  * positive prompt, so this is advisory for providers that accept it.
  */
 export const NEGATIVE_PROMPT =
-  "gradients, drop shadows, paper texture, complex or colored background, " +
-  "glossy commercial vector style, PPT infographic, dense diagram, dashboard, " +
-  "children's-book look, cute plush mascot, emoji, sticker, logo, realistic UI, " +
-  "long sentences, paragraphs of text, watermark, multiple unrelated objects, clutter";
+  "photoreal render, 3D corporate render, glossy commercial vector style, " +
+  "PPT infographic, dense diagram, dashboard, children's-book look, cute plush " +
+  "mascot, emoji, sticker, logo, realistic UI, long sentences, paragraphs of " +
+  "text, watermark, multiple unrelated objects, clutter";
 
 export interface BuiltPrompt {
   positive: string;
@@ -38,16 +37,17 @@ export interface BuiltPrompt {
 }
 
 /**
- * Wrap the user's concept in the house illustration style.
+ * Wrap the user's concept in the house methodology plus the chosen look.
  *
- * `userIntent` is the idea to illustrate (e.g. "trust is built one piece of
- * evidence at a time"). The caller separately supplies the avatar reference
- * image, which carries the character's identity.
+ * `userIntent` is the idea to illustrate; `styleId` selects the rendering look
+ * (defaults to the house marker look when empty/unknown). The avatar reference
+ * image is supplied separately and carries the character's identity.
  */
-export function buildPrompt(userIntent: string): BuiltPrompt {
+export function buildPrompt(userIntent: string, styleId?: string): BuiltPrompt {
+  const style = resolveStyle(styleId);
   const intent = userIntent.trim();
   return {
-    positive: `${STYLE_PREFIX}\n\nConcept to illustrate: ${intent}`,
+    positive: `${BASE_METHODOLOGY}\n\nLook: ${style.look}\n\nConcept to illustrate: ${intent}`,
     negative: NEGATIVE_PROMPT,
   };
 }
