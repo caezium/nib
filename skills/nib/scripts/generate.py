@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Sidekick illustration engine.
+"""Nib illustration engine.
 
 Generates one white-background 16:9 editorial illustration in which a recurring
 avatar performs the given idea, in a chosen look. No third-party dependencies.
@@ -86,8 +86,8 @@ def generate(idea: str, style: str, avatar: str | None, out: str) -> str:
         headers={
             "Content-Type": "application/json",
             "Authorization": f"Bearer {key}",
-            "HTTP-Referer": "https://github.com/caezium/sidekick-illustrator",
-            "X-Title": "Sidekick",
+            "HTTP-Referer": "https://github.com/caezium/nib",
+            "X-Title": "Nib",
         },
         method="POST",
     )

@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Nib — an illustrator that never breaks character</title>
+<meta name="description" content="Nib turns an idea or a whole article into original white-background editorial illustrations starring an avatar you own. An agent skill — free and open source." />
+<style>
+  :root {
+    --bg: #fbfaf7;
+    --ink: #1c1a17;
+    --muted: #6b6660;
+    --line: #e7e3db;
+    --card: #ffffff;
+    --accent: #e0533d;     /* warm marker red */
+    --accent-2: #2f6df0;   /* blueprint blue  */
+    --radius: 16px;
+    --maxw: 1040px;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: inherit; }
+  .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 24px; }
+  header { padding: 22px 0; }
+  .nav { display: flex; align-items: center; justify-content: space-between; }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 20px; letter-spacing: -0.02em; }
+  .brand .dot { width: 22px; height: 22px; border-radius: 7px; background: var(--ink); display: inline-block; position: relative; }
+  .brand .dot::after { content: ""; position: absolute; right: -3px; bottom: -3px; width: 9px; height: 9px; border-radius: 50%; background: var(--accent); }
+  .nav-links a { color: var(--muted); text-decoration: none; font-size: 14px; margin-left: 20px; font-weight: 500; }
+  .nav-links a:hover { color: var(--ink); }
+
+  /* Hero */
+  .hero { padding: 64px 0 40px; text-align: center; }
+  .eyebrow { color: var(--accent); font-weight: 700; font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; }
+  h1 { font-size: clamp(36px, 6vw, 62px); line-height: 1.02; letter-spacing: -0.03em; margin: 14px auto 18px; max-width: 14ch; }
+  .sub { font-size: clamp(17px, 2.4vw, 21px); color: var(--muted); max-width: 60ch; margin: 0 auto 30px; }
+  .cta { display: inline-flex; gap: 12px; align-items: center; flex-wrap: wrap; justify-content: center; }
+  .cmd {
+    display: inline-flex; align-items: center; gap: 10px; background: var(--ink); color: #fff;
+    padding: 12px 16px; border-radius: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 14px; cursor: pointer; border: none;
+  }
+  .cmd:hover { opacity: 0.92; }
+  .cmd .copy { color: #9aa0a6; font-size: 12px; }
+  .ghost { padding: 12px 16px; border: 1px solid var(--line); border-radius: 12px; text-decoration: none; color: var(--ink); font-weight: 600; font-size: 14px; background: var(--card); }
+  .note { margin-top: 14px; color: var(--muted); font-size: 13px; }
+
+  /* Gallery */
+  .gallery { padding: 28px 0 8px; }
+  .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+  @media (max-width: 880px) { .grid { grid-template-columns: repeat(2, 1fr); } }
+  .tile {
+    aspect-ratio: 16/9; background: var(--card); border: 1px solid var(--line); border-radius: 14px;
+    overflow: hidden; position: relative; display: flex; align-items: flex-end;
+  }
+  .tile img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+  .tile .tag { position: relative; z-index: 1; margin: 10px; font-size: 12px; font-weight: 600; color: var(--muted); background: rgba(255,255,255,0.82); padding: 3px 8px; border-radius: 999px; border: 1px solid var(--line); }
+
+  /* Sections */
+  section { padding: 56px 0; }
+  h2 { font-size: clamp(26px, 4vw, 36px); letter-spacing: -0.02em; margin: 0 0 8px; }
+  .lead { color: var(--muted); max-width: 56ch; }
+  .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-top: 28px; }
+  @media (max-width: 760px) { .steps { grid-template-columns: 1fr; } }
+  .step { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 22px; }
+  .step .n { width: 28px; height: 28px; border-radius: 8px; background: var(--ink); color: #fff; display: grid; place-items: center; font-weight: 700; font-size: 14px; margin-bottom: 12px; }
+  .step h3 { margin: 0 0 6px; font-size: 17px; }
+  .step p { margin: 0; color: var(--muted); font-size: 14.5px; }
+
+  .looks { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 22px; }
+  .chip { border: 1px solid var(--line); background: var(--card); border-radius: 999px; padding: 8px 14px; font-size: 14px; font-weight: 600; }
+
+  /* Cost */
+  .cost { background: var(--ink); color: #fff; border-radius: 22px; padding: 40px; text-align: center; }
+  .cost h2 { color: #fff; }
+  .cost .big { font-size: clamp(28px, 5vw, 44px); font-weight: 800; letter-spacing: -0.02em; margin: 6px 0; }
+  .cost .big b { color: #ffb86b; }
+  .cost p { color: #b9b4ad; max-width: 52ch; margin: 6px auto 0; }
+
+  /* Install */
+  .installs { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin-top: 24px; }
+  @media (max-width: 760px) { .installs { grid-template-columns: 1fr; } }
+  .inst { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; }
+  .inst .k { font-weight: 700; font-size: 14px; margin-bottom: 8px; }
+  .inst code { display: block; background: #f4f1ec; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; font-family: ui-monospace, Menlo, monospace; font-size: 13px; overflow-x: auto; white-space: pre; }
+
+  footer { border-top: 1px solid var(--line); padding: 28px 0 48px; color: var(--muted); font-size: 14px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+  .toast { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--ink); color: #fff; padding: 10px 16px; border-radius: 10px; font-size: 14px; opacity: 0; transition: all .2s; pointer-events: none; }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <nav class="nav">
+      <div class="brand"><span class="dot"></span> Nib</div>
+      <div class="nav-links">
+        <a href="#looks">Looks</a>
+        <a href="#how">How it works</a>
+        <a href="#install">Install</a>
+        <a href="https://github.com/caezium/nib">GitHub</a>
+      </div>
+    </nav>
+  </header>
+
+  <section class="hero">
+    <div class="eyebrow">Editorial illustrations for agents</div>
+    <h1>An illustrator that never breaks character.</h1>
+    <p class="sub">Nib turns an idea — or a whole article — into original, white-background editorial illustrations starring an avatar <em>you</em> own. One image, one idea. No stock art, no prompt fiddling.</p>
+    <div class="cta">
+      <button class="cmd" data-copy="npx skills add caezium/nib --skill nib">npx skills add caezium/nib --skill nib <span class="copy">copy</span></button>
+      <a class="ghost" href="https://github.com/caezium/nib">View on GitHub</a>
+    </div>
+    <div class="note">Free &amp; open source · works in Claude Code, Codex, Cursor &amp; Gemini</div>
+  </section>
+
+  <section class="gallery">
+    <!-- Swap each tile's <img src> with a real render per look. -->
+    <div class="grid">
+      <div class="tile"><span class="tag">Marker</span></div>
+      <div class="tile"><span class="tag">Riso</span></div>
+      <div class="tile"><span class="tag">Blueprint</span></div>
+      <div class="tile"><span class="tag">Woodcut</span></div>
+      <div class="tile"><span class="tag">Pixel</span></div>
+      <div class="tile"><span class="tag">Clay</span></div>
+      <div class="tile"><span class="tag">Gouache</span></div>
+      <div class="tile"><span class="tag">Your avatar</span></div>
+    </div>
+  </section>
+
+  <section id="how">
+    <h2>One idea. One picture. Your character.</h2>
+    <p class="lead">Hand Nib a post and it finds the load-bearing moments — the judgment, the trap, the before/after — and draws each one as a single scene. Not one image per paragraph. The ones that matter.</p>
+    <div class="steps">
+      <div class="step"><div class="n">1</div><h3>Bring your avatar</h3><p>A mascot, a logo character, any avatar. It becomes the reference on every render, so your character stays on-model — forever yours.</p></div>
+      <div class="step"><div class="n">2</div><h3>Drop an idea or article</h3><p>A single concept, or a whole post. Nib plans a shot list of the ideas worth illustrating and picks a look.</p></div>
+      <div class="step"><div class="n">3</div><h3>Get a consistent set</h3><p>White-background 16:9 illustrations, your character performing each idea, ready to drop into the post.</p></div>
+    </div>
+  </section>
+
+  <section id="looks">
+    <h2>Seven print looks.</h2>
+    <p class="lead">One house methodology, the look is a parameter. Pick one per piece so a set reads as a series.</p>
+    <div class="looks">
+      <span class="chip">Marker</span><span class="chip">Riso</span><span class="chip">Blueprint</span>
+      <span class="chip">Woodcut</span><span class="chip">Pixel</span><span class="chip">Clay</span><span class="chip">Gouache</span>
+    </div>
+  </section>
+
+  <section>
+    <div class="cost">
+      <h2>Basically free.</h2>
+      <div class="big">~<b>5¢</b> an image · a whole blog post for <b>under a dollar</b></div>
+      <p>The skill is free and open source. Image generation runs on your own OpenRouter key (<code>google/gemini-2.5-flash-image</code>). No subscription, no markup.</p>
+    </div>
+  </section>
+
+  <section id="install">
+    <h2>Install everywhere.</h2>
+    <p class="lead">Nib ships as an agent skill — one command, no app to download.</p>
+    <div class="installs">
+      <div class="inst"><div class="k">Claude Code</div><code>npx skills add caezium/nib --skill nib</code></div>
+      <div class="inst"><div class="k">Codex CLI</div><code>codex plugin add caezium/nib</code></div>
+      <div class="inst"><div class="k">Cursor</div><code>Add plugin: caezium/nib</code></div>
+      <div class="inst"><div class="k">Gemini CLI</div><code>gemini extensions install caezium/nib</code></div>
+    </div>
+    <div class="note">Requires <code>python3</code> and an <code>OPENROUTER_API_KEY</code>. Prefer a desktop app? One is in the works.</div>
+  </section>
+
+  <footer>
+    <div>© 2026 Nib · MIT licensed</div>
+    <div><a href="https://github.com/caezium/nib">github.com/caezium/nib</a></div>
+  </footer>
+</div>
+
+<div class="toast" id="toast">Copied</div>
+<script>
+  const toast = document.getElementById('toast');
+  document.querySelectorAll('[data-copy]').forEach((el) => {
+    el.addEventListener('click', async () => {
+      try { await navigator.clipboard.writeText(el.dataset.copy); } catch (e) {}
+      toast.classList.add('show');
+      setTimeout(() => toast.classList.remove('show'), 1400);
+    });
+  });
+</script>
+</body>
+</html>

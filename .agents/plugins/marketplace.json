@@ -1,0 +1,13 @@
+{
+  "name": "nib",
+  "plugins": [
+    {
+      "name": "nib",
+      "source": {
+        "source": "url",
+        "url": "https://github.com/caezium/nib"
+      },
+      "category": "creative"
+    }
+  ]
+}

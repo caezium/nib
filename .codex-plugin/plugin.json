@@ -1,0 +1,6 @@
+{
+  "name": "nib",
+  "version": "0.1.0",
+  "description": "Original editorial illustrations where a recurring avatar you own performs the idea — seven white-background print looks, OpenRouter-powered. Ships the Nib Agent Skill and its image engine.",
+  "skills": "./skills"
+}

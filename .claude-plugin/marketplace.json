@@ -1,0 +1,23 @@
+{
+  "name": "nib",
+  "owner": {
+    "name": "caezium",
+    "url": "https://github.com/caezium"
+  },
+  "metadata": {
+    "description": "Marketplace for the Nib editorial-illustration skill",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "nib",
+      "source": {
+        "source": "url",
+        "url": "https://github.com/caezium/nib.git"
+      },
+      "description": "Original editorial illustrations where a recurring avatar you own performs the idea — seven white-background print looks, OpenRouter-powered. Turns one idea or a whole article into a consistent illustration set.",
+      "version": "0.1.0",
+      "strict": true
+    }
+  ]
+}

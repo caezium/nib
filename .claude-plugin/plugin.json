@@ -1,0 +1,20 @@
+{
+  "name": "nib",
+  "displayName": "Nib",
+  "version": "0.1.0",
+  "description": "Original editorial illustrations where a recurring avatar you own performs the idea — seven white-background print looks, a built-in methodology, and an OpenRouter image engine. Turns one idea or a whole article into a consistent illustration set.",
+  "author": {
+    "name": "caezium",
+    "url": "https://github.com/caezium"
+  },
+  "homepage": "https://github.com/caezium/nib",
+  "repository": "https://github.com/caezium/nib",
+  "license": "MIT",
+  "keywords": [
+    "illustration",
+    "editorial",
+    "mascot",
+    "image-generation",
+    "openrouter"
+  ]
+}

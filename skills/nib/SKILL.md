@@ -1,11 +1,11 @@
 ---
-name: sidekick
+name: nib
 description: >-
   Turns an idea or an article into original white-background, hand-drawn
   editorial illustrations starring a recurring avatar the user owns — one
   caught scene per idea, in one of several print looks. Use when the user asks
   to illustrate a post/article/concept with a consistent character, or invokes
-  "sidekick". Not for generic draw/make-an-image requests.
+  "nib". Not for generic draw/make-an-image requests.
 version: 0.1.0
 argument-hint: "[idea or article path/URL] | set avatar <image> | style <name>"
 license: MIT
@@ -16,7 +16,7 @@ metadata:
     env: [OPENROUTER_API_KEY]
 ---
 
-# Sidekick
+# Nib
 
 Make original editorial illustrations for written content. **One image explains
 one idea.** A **recurring avatar** — supplied once by the user — is the subject
