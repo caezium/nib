@@ -22,7 +22,7 @@ export function MacOSIcon({
   // Refine: one large confirmed illustration.
   if (state === "refine") {
     return (
-      <div className="w-full max-w-[560px]">
+      <div className="w-full max-w-[620px]">
         <Frame>
           {baseIconSrc ? (
             <img src={baseIconSrc} alt="Illustration" className="w-full h-full object-contain" draggable={false} />
@@ -61,7 +61,7 @@ export function MacOSIcon({
 
   // Idle / generating: placeholder.
   return (
-    <div className="w-full max-w-[560px]">
+    <div className="w-full max-w-[620px]">
       <Frame placeholder>
         {state === "generating" ? (
           <div className="absolute inset-0 animate-pulse bg-linear-to-br from-secondary/40 via-secondary/20 to-secondary/40" />

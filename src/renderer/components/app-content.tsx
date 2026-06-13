@@ -334,9 +334,9 @@ export function AppContent() {
       )}
 
       {mode === "concept" ? (
-        <>
-          {/* Illustration preview — pinned to top, centered horizontally. */}
-          <div className="flex justify-center pt-28 pb-20 px-10">
+        <div className="flex flex-1 min-h-0 flex-col px-6 pt-16 pb-4 gap-4">
+          {/* Preview fills the available space, vertically centered. */}
+          <div className="flex flex-1 min-h-0 items-center justify-center">
             <MacOSIcon
               state={iconState}
               selected={selectedVariant}
@@ -346,8 +346,8 @@ export function AppContent() {
             />
           </div>
 
-          {/* Bottom area — style picker + input, pushed to the bottom. */}
-          <div className="flex flex-1 flex-col items-center justify-end gap-3 px-4 pb-4">
+          {/* Controls pinned at the bottom. */}
+          <div className="flex shrink-0 flex-col items-center gap-3">
             <StylePicker
               styles={styles}
               value={selectedStyle}
@@ -370,7 +370,7 @@ export function AppContent() {
               onOpenAvatarSettings={() => setAvatarModal("settings")}
             />
           </div>
-        </>
+        </div>
       ) : (
         <ArticlePanel style={selectedStyle} styles={styles} onStyleChange={setSelectedStyle} />
       )}
