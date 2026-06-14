@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import { Clock, Download } from "lucide-react"
+import { Clock, Download, Info } from "lucide-react"
 import { MacOSIcon } from "@/components/macos-icon"
 import { HistoryPanel } from "@/components/history-panel"
+import { AboutModal } from "@/components/about-modal"
 import {
   OpenAIApiKeyManageModal,
   OpenAIApiKeyStartupModal,
@@ -44,6 +45,8 @@ export function AppContent() {
   const [mockMode, setMockMode] = useState(false)
   // Generation history drawer.
   const [historyOpen, setHistoryOpen] = useState(false)
+  // "More ways to use Nib" info modal.
+  const [aboutOpen, setAboutOpen] = useState(false)
   // Single-concept vs whole-article batch mode.
   const [mode, setMode] = useState<"concept" | "article">("concept")
   // Look library + current selection.
@@ -127,6 +130,20 @@ export function AppContent() {
   useEffect(() => {
     ipc.app.SetUnsavedIconState({ unsaved: iconDirty }).catch(() => {})
   }, [iconDirty])
+
+  // Once the user is past onboarding, show "More ways to use Nib" a single time
+  // so they discover the agent-skill / article / styles features.
+  useEffect(() => {
+    if (!avatarReady || avatarModal !== null || openAIApiKeyStartupOpen) return
+    try {
+      if (!localStorage.getItem("nib.seenAbout")) {
+        localStorage.setItem("nib.seenAbout", "1")
+        setAboutOpen(true)
+      }
+    } catch {
+      /* localStorage unavailable — the info button still works */
+    }
+  }, [avatarReady, avatarModal, openAIApiKeyStartupOpen])
 
   const startGeneration = () => {
     if (!prompt.trim() || iconState === "generating") return
@@ -335,8 +352,17 @@ export function AppContent() {
         </div>
       </div>
 
-      {/* Top-right: history + save (Save is concept-only; article cards save individually). */}
+      {/* Top-right: more-info + history + save (Save is concept-only; article cards save individually). */}
       <div className="absolute top-3 right-3 z-50 flex items-center gap-2 non-draggable">
+        <button
+          type="button"
+          onClick={() => setAboutOpen(true)}
+          title="More ways to use Nib"
+          aria-label="More ways to use Nib"
+          className="flex items-center justify-center w-8 h-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-white/10 transition-colors"
+        >
+          <Info className="w-4 h-4" />
+        </button>
         <button
           type="button"
           onClick={() => setHistoryOpen(true)}
@@ -368,6 +394,8 @@ export function AppContent() {
         onClose={() => setHistoryOpen(false)}
         onOpenItem={openHistoryItem}
       />
+
+      {aboutOpen && <AboutModal onClose={() => setAboutOpen(false)} />}
 
       {mode === "concept" ? (
         <div className="flex flex-1 min-h-0 flex-col px-6 pt-16 pb-4 gap-4">
