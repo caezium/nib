@@ -30,6 +30,8 @@ export interface IconPipeline {
   rawVariants: (string | null)[]
   generate: (prompt: string, referenceDataUrl?: string, style?: string) => void
   cancel: () => void
+  /** Load a past generation's variants into the preview (from history). */
+  loadVariants: (dataUrls: string[]) => void
 }
 
 // ── Blob/data URL → base64 helper ──────────────────────────────────────────
@@ -130,5 +132,15 @@ export function useIconPipeline(): IconPipeline {
     }
   }, [])
 
-  return { status, progress, variants, rawVariants, generate, cancel }
+  const loadVariants = useCallback((dataUrls: string[]) => {
+    cancelledRef.current = true // drop any in-flight generation
+    const next: (string | null)[] = [null, null, null]
+    for (let i = 0; i < Math.min(dataUrls.length, 3); i++) next[i] = dataUrls[i]
+    setVariants(next)
+    setRawVariants(next)
+    setStatus("done")
+    setProgress({ fraction: 1, label: "" })
+  }, [])
+
+  return { status, progress, variants, rawVariants, generate, cancel, loadVariants }
 }

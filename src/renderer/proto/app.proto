@@ -125,6 +125,40 @@ message GetAvatarResponse {
   bool has_avatar = 3;
 }
 
+// --- Generation history ---
+
+message HistoryItem {
+  string id = 1;
+  // ISO 8601 timestamp.
+  string created_at = 2;
+  string prompt = 3;
+  string style = 4;
+  // Small thumbnail (first variant), base64 PNG, no data URL prefix.
+  string thumb_b64 = 5;
+  // Number of variants stored for this generation.
+  int32 count = 6;
+}
+
+message GetHistoryRequest {}
+
+message GetHistoryResponse {
+  // Newest first.
+  repeated HistoryItem items = 1;
+}
+
+message GetHistoryItemRequest {
+  string id = 1;
+}
+
+message GetHistoryItemResponse {
+  // Full-resolution variants, base64 PNG, no data URL prefix.
+  repeated string images = 1;
+}
+
+message ClearHistoryRequest {}
+
+message ClearHistoryResponse {}
+
 // --- Article -> shot list (text LLM) ---
 
 message Shot {
@@ -161,4 +195,7 @@ service AppService {
   rpc GetAvatar(GetAvatarRequest) returns (GetAvatarResponse);
   rpc MakeShotList(MakeShotListRequest) returns (MakeShotListResponse);
   rpc GetStyles(GetStylesRequest) returns (GetStylesResponse);
+  rpc GetHistory(GetHistoryRequest) returns (GetHistoryResponse);
+  rpc GetHistoryItem(GetHistoryItemRequest) returns (GetHistoryItemResponse);
+  rpc ClearHistory(ClearHistoryRequest) returns (ClearHistoryResponse);
 }

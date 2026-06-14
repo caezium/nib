@@ -12,6 +12,12 @@ import {
   GetStoredOpenAIApiKeyResponse,
   GetStylesRequest,
   GetStylesResponse,
+  GetHistoryRequest,
+  GetHistoryResponse,
+  GetHistoryItemRequest,
+  GetHistoryItemResponse,
+  ClearHistoryRequest,
+  ClearHistoryResponse,
   MakeShotListRequest,
   MakeShotListResponse,
   OpenExternalUrlRequest,
@@ -43,6 +49,12 @@ import {
   setAvatar,
 } from './lib/avatar-store';
 import { makeShotList } from './lib/shot-list';
+import {
+  saveGeneration,
+  listHistory,
+  getHistoryItem,
+  clearHistory,
+} from './lib/history-store';
 
 const GITHUB_REPOSITORY_URL = 'https://github.com/caezium/sidekick-illustrator';
 
@@ -332,6 +344,10 @@ ipc.registerService(AppServiceDescriptor, {
         referenceImageB64: reference,
         count,
       });
+      // Save real generations to history (skip mock placeholders).
+      if (result.images.length > 0 && resolveProviderName() !== 'mock') {
+        saveGeneration(request.prompt, request.style, result.images).catch(() => {});
+      }
       return { images: result.images, error: '' };
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -341,6 +357,31 @@ ipc.registerService(AppServiceDescriptor, {
 
   async GetStyles(_request: GetStylesRequest): Promise<GetStylesResponse> {
     return { styles: styleList() };
+  },
+
+  async GetHistory(_request: GetHistoryRequest): Promise<GetHistoryResponse> {
+    const items = await listHistory();
+    return {
+      items: items.map((it) => ({
+        id: it.id,
+        createdAt: it.createdAt,
+        prompt: it.prompt,
+        style: it.style,
+        thumbB64: it.thumbB64,
+        count: it.count,
+      })),
+    };
+  },
+
+  async GetHistoryItem(
+    request: GetHistoryItemRequest
+  ): Promise<GetHistoryItemResponse> {
+    return { images: await getHistoryItem(request.id) };
+  },
+
+  async ClearHistory(_request: ClearHistoryRequest): Promise<ClearHistoryResponse> {
+    await clearHistory();
+    return {};
   },
 
   async MakeShotList(request: MakeShotListRequest): Promise<MakeShotListResponse> {

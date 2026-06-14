@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import { Download } from "lucide-react"
+import { Clock, Download } from "lucide-react"
 import { MacOSIcon } from "@/components/macos-icon"
+import { HistoryPanel } from "@/components/history-panel"
 import {
   OpenAIApiKeyManageModal,
   OpenAIApiKeyStartupModal,
@@ -41,6 +42,8 @@ export function AppContent() {
   const [avatarModal, setAvatarModal] = useState<"setup" | "settings" | null>(null)
   // True when the mock provider is active (placeholder images, no API calls).
   const [mockMode, setMockMode] = useState(false)
+  // Generation history drawer.
+  const [historyOpen, setHistoryOpen] = useState(false)
   // Single-concept vs whole-article batch mode.
   const [mode, setMode] = useState<"concept" | "article">("concept")
   // Look library + current selection.
@@ -182,6 +185,24 @@ export function AppContent() {
     }
   }
 
+  const openHistoryItem = useCallback(
+    async (id: string) => {
+      try {
+        const res = await ipc.app.GetHistoryItem({ id })
+        if (res.images.length === 0) return
+        const urls = res.images.map((b) => `data:image/png;base64,${b}`)
+        setMode("concept")
+        setSelectedVariant(null)
+        pipeline.loadVariants(urls)
+        setIconState("generated")
+        setHistoryOpen(false)
+      } catch {
+        /* ignore */
+      }
+    },
+    [pipeline]
+  )
+
   const inputPlaceholder =
     iconState === "refine"
       ? "Refine this illustration, or describe a new idea…"
@@ -314,14 +335,23 @@ export function AppContent() {
         </div>
       </div>
 
-      {/* Save button — top right corner (concept mode only; article cards save individually). */}
-      {mode === "concept" && (
-        <div className="absolute top-3 right-3 z-50">
+      {/* Top-right: history + save (Save is concept-only; article cards save individually). */}
+      <div className="absolute top-3 right-3 z-50 flex items-center gap-2 non-draggable">
+        <button
+          type="button"
+          onClick={() => setHistoryOpen(true)}
+          title="History"
+          aria-label="History"
+          className="flex items-center justify-center w-8 h-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-white/10 transition-colors"
+        >
+          <Clock className="w-4 h-4" />
+        </button>
+        {mode === "concept" && (
           <button
             disabled={!canSave}
             onClick={handleSave}
             className={cn(
-              "flex items-center gap-2 px-4 h-8 rounded-lg text-sm font-medium transition-all duration-200 non-draggable",
+              "flex items-center gap-2 px-4 h-8 rounded-lg text-sm font-medium transition-all duration-200",
               canSave
                 ? "bg-primary text-primary-foreground hover:bg-primary/90 active:scale-[0.97] shadow-md"
                 : "bg-secondary/30 text-muted-foreground/40 cursor-not-allowed"
@@ -330,8 +360,14 @@ export function AppContent() {
             <Download className="w-3.5 h-3.5" />
             Save
           </button>
-        </div>
-      )}
+        )}
+      </div>
+
+      <HistoryPanel
+        open={historyOpen}
+        onClose={() => setHistoryOpen(false)}
+        onOpenItem={openHistoryItem}
+      />
 
       {mode === "concept" ? (
         <div className="flex flex-1 min-h-0 flex-col px-6 pt-16 pb-4 gap-4">
