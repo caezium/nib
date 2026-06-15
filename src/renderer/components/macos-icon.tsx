@@ -12,12 +12,20 @@ export function MacOSIcon({
   onSelect,
   variants,
   baseIconSrc,
+  examples,
+  onPickExample,
+  showExamples,
 }: {
   state: IconState
   selected: number | null
   onSelect: (i: number) => void
   variants: (string | null)[]
   baseIconSrc?: string | null
+  /** Starter concepts to show in the empty preview area. */
+  examples?: string[]
+  onPickExample?: (text: string) => void
+  /** When true (idle + empty prompt), show examples instead of the placeholder. */
+  showExamples?: boolean
 }) {
   // Refine: one large confirmed illustration.
   if (state === "refine") {
@@ -59,18 +67,51 @@ export function MacOSIcon({
     )
   }
 
-  // Idle / generating: placeholder.
+  // Generating: animated placeholder.
+  if (state === "generating") {
+    return (
+      <div className="w-full max-w-[620px]">
+        <Frame placeholder>
+          <div className="absolute inset-0 animate-pulse bg-linear-to-br from-secondary/40 via-secondary/20 to-secondary/40" />
+        </Frame>
+      </div>
+    )
+  }
+
+  // Idle + empty prompt: fill the space with starter concepts.
+  if (showExamples && examples && examples.length > 0) {
+    return (
+      <div className="w-full max-w-[620px]">
+        <p className="text-center text-xs text-muted-foreground mb-3">
+          Not sure where to start? Pick a concept:
+        </p>
+        <div className="grid grid-cols-2 gap-2">
+          {examples.map((ex, i) => (
+            <button
+              key={i}
+              type="button"
+              onClick={() => onPickExample?.(ex)}
+              className={cn(
+                "text-left text-[13px] leading-snug rounded-xl border px-3 py-2.5 transition-colors",
+                "border-border bg-secondary/40 text-foreground/90 hover:bg-secondary hover:border-foreground/30"
+              )}
+            >
+              {ex}
+            </button>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  // Idle with text typed: the waiting placeholder.
   return (
     <div className="w-full max-w-[620px]">
       <Frame placeholder>
-        {state === "generating" ? (
-          <div className="absolute inset-0 animate-pulse bg-linear-to-br from-secondary/40 via-secondary/20 to-secondary/40" />
-        ) : (
-          <div className="flex flex-col items-center gap-2 text-muted-foreground">
-            <ImageIcon className="w-8 h-8" strokeWidth={1.5} />
-            <span className="text-xs">Your illustration will appear here</span>
-          </div>
-        )}
+        <div className="flex flex-col items-center gap-2 text-muted-foreground">
+          <ImageIcon className="w-8 h-8" strokeWidth={1.5} />
+          <span className="text-xs">Your illustration will appear here</span>
+        </div>
       </Frame>
     </div>
   )

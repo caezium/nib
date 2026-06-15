@@ -17,6 +17,7 @@ import { StylePicker, type StyleOption } from "@/components/style-picker"
 import { TitleBarStatus } from "@/components/title-bar-status"
 import type { IconState } from "@/components/icon-types"
 import { useIconPipeline } from "@/lib/icon-pipeline"
+import { EXAMPLE_PROMPTS } from "@/lib/examples"
 import { ipc } from "@/gen/ipc"
 import { cn } from "@/lib/utils"
 
@@ -407,6 +408,9 @@ export function AppContent() {
               onSelect={setSelectedVariant}
               variants={pipeline.variants}
               baseIconSrc={baseIconSrc}
+              examples={EXAMPLE_PROMPTS}
+              onPickExample={setPrompt}
+              showExamples={iconState === "idle" && !prompt.trim()}
             />
           </div>
 
