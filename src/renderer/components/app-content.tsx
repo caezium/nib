@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import { Clock, Download, Info } from "lucide-react"
+import { Clock, Download, Info, Settings } from "lucide-react"
 import { MacOSIcon } from "@/components/macos-icon"
 import { HistoryPanel } from "@/components/history-panel"
 import { AboutModal } from "@/components/about-modal"
+import { SettingsModal } from "@/components/settings-modal"
 import { Lightbox } from "@/components/lightbox"
 import {
   OpenAIApiKeyManageModal,
@@ -50,6 +51,8 @@ export function AppContent() {
   const [historyOpen, setHistoryOpen] = useState(false)
   // "More ways to use Nib" info modal.
   const [aboutOpen, setAboutOpen] = useState(false)
+  // Settings modal (telemetry opt-out).
+  const [settingsOpen, setSettingsOpen] = useState(false)
   // Full-screen image viewer (null = closed).
   const [lightbox, setLightbox] = useState<string | null>(null)
   // Single-concept vs whole-article batch mode.
@@ -102,6 +105,36 @@ export function AppContent() {
         if (r.styles.length > 0) setSelectedStyle((cur) => cur || r.styles[0].id)
       })
       .catch(() => {})
+  }, [])
+
+  // Forward uncaught UI errors to the main process so they reach the same crash
+  // sink (the telemetry opt-out is enforced there, so nothing is sent when off).
+  useEffect(() => {
+    const onError = (e: ErrorEvent) => {
+      ipc.app
+        .ReportRendererError({
+          message: e.message || "Renderer error",
+          stack: e.error instanceof Error ? (e.error.stack ?? "") : "",
+          source: "window.onerror",
+        })
+        .catch(() => {})
+    }
+    const onRejection = (e: PromiseRejectionEvent) => {
+      const reason = e.reason
+      ipc.app
+        .ReportRendererError({
+          message: reason instanceof Error ? reason.message : String(reason),
+          stack: reason instanceof Error ? (reason.stack ?? "") : "",
+          source: "unhandledrejection",
+        })
+        .catch(() => {})
+    }
+    window.addEventListener("error", onError)
+    window.addEventListener("unhandledrejection", onRejection)
+    return () => {
+      window.removeEventListener("error", onError)
+      window.removeEventListener("unhandledrejection", onRejection)
+    }
   }, [])
 
   const clearAttachments = useCallback(() => {
@@ -380,6 +413,15 @@ export function AppContent() {
       <div className="absolute top-3 right-3 z-50 flex items-center gap-2 non-draggable">
         <button
           type="button"
+          onClick={() => setSettingsOpen(true)}
+          title="Settings"
+          aria-label="Settings"
+          className="flex items-center justify-center w-8 h-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-white/10 transition-colors"
+        >
+          <Settings className="w-4 h-4" />
+        </button>
+        <button
+          type="button"
           onClick={() => setAboutOpen(true)}
           title="More ways to use Nib"
           aria-label="More ways to use Nib"
@@ -420,6 +462,7 @@ export function AppContent() {
       />
 
       {aboutOpen && <AboutModal onClose={() => setAboutOpen(false)} />}
+      {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}
 
       <Lightbox src={lightbox} onClose={() => setLightbox(null)} />
 

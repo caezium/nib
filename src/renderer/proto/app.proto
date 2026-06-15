@@ -197,6 +197,27 @@ message MakeShotListResponse {
   string error = 2;
 }
 
+// --- Telemetry (anonymous usage + crash reporting; opt-out) ---
+
+message GetTelemetryOptOutRequest {}
+
+message GetTelemetryOptOutResponse {
+  // True when the user has opted out of anonymous telemetry.
+  bool opt_out = 1;
+}
+
+message SetTelemetryOptOutRequest {
+  bool opt_out = 1;
+}
+
+// Forwarded from the renderer so UI crashes reach the same error sink as the
+// main process. Carries no user content (no prompts, avatar, or images).
+message ReportRendererErrorRequest {
+  string message = 1;
+  string stack = 2;
+  string source = 3;
+}
+
 service AppService {
   rpc SetTheme(SetThemeRequest) returns (google.protobuf.Empty);
   rpc SetUnsavedIconState(SetUnsavedIconStateRequest) returns (google.protobuf.Empty);
@@ -216,4 +237,7 @@ service AppService {
   rpc GetHistory(GetHistoryRequest) returns (GetHistoryResponse);
   rpc GetHistoryItem(GetHistoryItemRequest) returns (GetHistoryItemResponse);
   rpc ClearHistory(ClearHistoryRequest) returns (ClearHistoryResponse);
+  rpc GetTelemetryOptOut(GetTelemetryOptOutRequest) returns (GetTelemetryOptOutResponse);
+  rpc SetTelemetryOptOut(SetTelemetryOptOutRequest) returns (google.protobuf.Empty);
+  rpc ReportRendererError(ReportRendererErrorRequest) returns (google.protobuf.Empty);
 }

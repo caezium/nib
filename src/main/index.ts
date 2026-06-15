@@ -34,6 +34,10 @@ import {
   SetThemeRequest,
   SetUnsavedIconStateRequest,
   ShowPathInFinderRequest,
+  GetTelemetryOptOutRequest,
+  GetTelemetryOptOutResponse,
+  SetTelemetryOptOutRequest,
+  ReportRendererErrorRequest,
 } from './gen/app';
 import { AppServiceDescriptor } from './gen/ipc_service';
 import { buildPrompt } from './lib/prompt-builder';
@@ -58,6 +62,13 @@ import {
   getHistoryItem,
   clearHistory,
 } from './lib/history-store';
+import {
+  initTelemetry,
+  isOptedOut,
+  setOptedOut,
+  capture,
+  captureError,
+} from './lib/telemetry';
 
 const GITHUB_REPOSITORY_URL = 'https://github.com/caezium/nib';
 
@@ -79,6 +90,9 @@ async function showAboutDialog() {
 
 // Set the theme to dark by default.
 app.setTheme('dark');
+
+// Anonymous, opt-out telemetry (usage events + crash reports).
+initTelemetry(resolveProviderName());
 
 // ---------------------------------------------------------------------------
 // Main App Menu
@@ -252,9 +266,12 @@ ipc.registerService(AppServiceDescriptor, {
       // back via SetUnsavedIconState); the main process no longer flips the flag
       // itself, so an Article-mode save can't silently clear a Concept-mode
       // unsaved state.
+      capture('save', { status: 'ok' });
       return { savedPath: path.dirname(target), canceled: false, imagePath: target, error: '' };
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
+      capture('save', { status: 'error' });
+      captureError(err, { scope: 'save' });
       return { savedPath: '', canceled: false, imagePath: '', error: `Could not save the file: ${message}` };
     }
   },
@@ -338,6 +355,8 @@ ipc.registerService(AppServiceDescriptor, {
   },
 
   async GenerateIcon(request: GenerateIconRequest): Promise<GenerateIconResponse> {
+    const startedAt = Date.now();
+    const provider = resolveProviderName();
     try {
       const { positive, negative } = buildPrompt(request.prompt, request.style);
       // The avatar is the persistent reference character; a per-generation
@@ -361,12 +380,27 @@ ipc.registerService(AppServiceDescriptor, {
       });
       // Save real generations to history (skip mock placeholders). Awaited so
       // the serialized index write finishes (and orders) before we return.
-      if (result.images.length > 0 && resolveProviderName() !== 'mock') {
+      if (result.images.length > 0 && provider !== 'mock') {
         await saveGeneration(request.prompt, request.style, result.images).catch(() => {});
       }
+      capture('generation', {
+        status: 'ok',
+        style: request.style,
+        provider,
+        variants: result.images.length,
+        requested: count,
+        duration_ms: Date.now() - startedAt,
+      });
       return { images: result.images, error: '' };
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
+      capture('generation', {
+        status: 'error',
+        style: request.style,
+        provider,
+        duration_ms: Date.now() - startedAt,
+      });
+      captureError(err, { scope: 'generate' });
       return { images: [], error: message };
     }
   },
@@ -406,9 +440,12 @@ ipc.registerService(AppServiceDescriptor, {
     }
     try {
       const { markdown, title } = await fetchArticle(request.url);
+      capture('article_fetch', { status: 'ok' });
       return { markdown, title, error: '' };
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
+      capture('article_fetch', { status: 'error' });
+      captureError(err, { scope: 'article_fetch' });
       return { markdown: '', title: '', error: message };
     }
   },
@@ -416,6 +453,7 @@ ipc.registerService(AppServiceDescriptor, {
   async MakeShotList(request: MakeShotListRequest): Promise<MakeShotListResponse> {
     try {
       const shots = await makeShotList(request.article);
+      capture('shotlist', { status: 'ok', shots: shots.length });
       return {
         shots: shots.map((s) => ({
           theme: s.theme,
@@ -426,6 +464,8 @@ ipc.registerService(AppServiceDescriptor, {
       };
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
+      capture('shotlist', { status: 'error' });
+      captureError(err, { scope: 'shotlist' });
       return { shots: [], error: message };
     }
   },
@@ -459,5 +499,25 @@ ipc.registerService(AppServiceDescriptor, {
       return { error: 'Could not save preferences to disk.' };
     }
     return { error: '' };
+  },
+
+  async GetTelemetryOptOut(
+    _request: GetTelemetryOptOutRequest
+  ): Promise<GetTelemetryOptOutResponse> {
+    return { optOut: isOptedOut() };
+  },
+
+  async SetTelemetryOptOut(request: SetTelemetryOptOutRequest) {
+    setOptedOut(request.optOut);
+    return {};
+  },
+
+  async ReportRendererError(request: ReportRendererErrorRequest) {
+    // The renderer forwards UI crashes here so they reach the same sink. The
+    // payload is content-free (message + stack + a source tag).
+    const err = new Error(request.message || 'Renderer error');
+    if (request.stack) err.stack = request.stack;
+    captureError(err, { scope: 'renderer', source: request.source });
+    return {};
   },
 });
