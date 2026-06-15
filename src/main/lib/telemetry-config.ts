@@ -10,8 +10,11 @@
  * No prompt text, avatar, API key, or generated image is ever sent — see
  * telemetry.ts for exactly what each event carries.
  */
-export const SENTRY_DSN = process.env.NIB_SENTRY_DSN ?? '';
+export const SENTRY_DSN =
+  process.env.NIB_SENTRY_DSN ??
+  'https://d3445a9c589e219c90232d17f2b723ef@o4510941431922688.ingest.us.sentry.io/4511570492456960';
 
-export const POSTHOG_KEY = process.env.NIB_POSTHOG_KEY ?? '';
+export const POSTHOG_KEY =
+  process.env.NIB_POSTHOG_KEY ?? 'phc_3RWM3V4Z531drOnYCloeuOnyBt67hla7ywhTLywqcFT';
 
 export const POSTHOG_HOST = process.env.NIB_POSTHOG_HOST ?? 'https://us.i.posthog.com';
