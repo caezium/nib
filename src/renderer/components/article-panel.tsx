@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react"
-import { Download, ImageIcon, Loader2, RefreshCw, Sparkles } from "lucide-react"
+import { Download, ImageIcon, Link2, Loader2, RefreshCw, Sparkles } from "lucide-react"
 import { ipc } from "@/gen/ipc"
 import type { Shot } from "@/gen/app"
 import { StylePicker, type StyleOption } from "@/components/style-picker"
@@ -35,6 +35,28 @@ export function ArticlePanel({
   const [planError, setPlanError] = useState<string | null>(null)
   const [results, setResults] = useState<ShotResult[]>([])
   const [batchRunning, setBatchRunning] = useState(false)
+  const [fetching, setFetching] = useState(false)
+  const [fetchError, setFetchError] = useState<string | null>(null)
+
+  // Treat a single-line, space-free, dotted token as a URL to fetch.
+  const trimmed = article.trim()
+  const isUrl =
+    trimmed.length > 0 && !/\s/.test(trimmed) && /\.[a-z]{2,}(\/|$|\?|#)/i.test(trimmed)
+
+  const fetchFromUrl = useCallback(async () => {
+    if (!isUrl || fetching) return
+    setFetching(true)
+    setFetchError(null)
+    try {
+      const res = await ipc.app.FetchArticle({ url: trimmed })
+      if (res.error) setFetchError(res.error)
+      else setArticle(res.markdown)
+    } catch {
+      setFetchError("Couldn't reach that page.")
+    } finally {
+      setFetching(false)
+    }
+  }, [isUrl, fetching, trimmed])
 
   const makeShotList = useCallback(async () => {
     if (!article.trim() || planning) return
@@ -144,7 +166,7 @@ export function ArticlePanel({
           <textarea
             value={article}
             onChange={(e) => setArticle(e.target.value)}
-            placeholder="Paste an article, post, or notes… Sidekick will pick 4–8 ideas to illustrate."
+            placeholder="Paste an article or a URL — or pick an example. Nib picks 4–8 ideas to illustrate."
             className={cn(
               "w-full flex-1 min-h-[200px] rounded-2xl border border-border bg-secondary/40 p-4",
               "text-sm text-foreground placeholder:text-muted-foreground resize-none outline-none",
@@ -152,21 +174,34 @@ export function ArticlePanel({
             )}
             style={{ scrollbarWidth: "thin" }}
           />
-          {planError && (
+          {(planError || fetchError) && (
             <p className="text-xs text-destructive" role="alert">
-              {planError}
+              {fetchError || planError}
             </p>
           )}
           <div className="flex justify-end">
-            <button
-              type="button"
-              disabled={!article.trim() || planning}
-              onClick={() => void makeShotList()}
-              className="flex items-center gap-2 h-9 px-4 rounded-xl text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
-            >
-              {planning ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-              {planning ? "Planning…" : "Make shot list"}
-            </button>
+            {isUrl ? (
+              <button
+                type="button"
+                disabled={fetching}
+                onClick={() => void fetchFromUrl()}
+                title="Fetch the article text from this URL"
+                className="flex items-center gap-2 h-9 px-4 rounded-xl text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
+              >
+                {fetching ? <Loader2 className="w-4 h-4 animate-spin" /> : <Link2 className="w-4 h-4" />}
+                {fetching ? "Fetching…" : "Fetch article"}
+              </button>
+            ) : (
+              <button
+                type="button"
+                disabled={!article.trim() || planning}
+                onClick={() => void makeShotList()}
+                className="flex items-center gap-2 h-9 px-4 rounded-xl text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
+              >
+                {planning ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                {planning ? "Planning…" : "Make shot list"}
+              </button>
+            )}
           </div>
         </>
       )}

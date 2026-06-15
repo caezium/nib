@@ -18,6 +18,8 @@ import {
   GetHistoryItemResponse,
   ClearHistoryRequest,
   ClearHistoryResponse,
+  FetchArticleRequest,
+  FetchArticleResponse,
   MakeShotListRequest,
   MakeShotListResponse,
   OpenExternalUrlRequest,
@@ -49,6 +51,7 @@ import {
   setAvatar,
 } from './lib/avatar-store';
 import { makeShotList } from './lib/shot-list';
+import { fetchArticle } from './lib/fetch-article';
 import {
   saveGeneration,
   listHistory,
@@ -382,6 +385,19 @@ ipc.registerService(AppServiceDescriptor, {
   async ClearHistory(_request: ClearHistoryRequest): Promise<ClearHistoryResponse> {
     await clearHistory();
     return {};
+  },
+
+  async FetchArticle(request: FetchArticleRequest): Promise<FetchArticleResponse> {
+    if (!request.url.trim()) {
+      return { markdown: '', title: '', error: 'Enter a URL.' };
+    }
+    try {
+      const { markdown, title } = await fetchArticle(request.url);
+      return { markdown, title, error: '' };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return { markdown: '', title: '', error: message };
+    }
   },
 
   async MakeShotList(request: MakeShotListRequest): Promise<MakeShotListResponse> {

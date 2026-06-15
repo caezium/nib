@@ -170,6 +170,19 @@ message Shot {
   repeated string labels = 3;
 }
 
+message FetchArticleRequest {
+  // A web page URL to extract readable article text from.
+  string url = 1;
+}
+
+message FetchArticleResponse {
+  // Extracted article as Markdown; empty on failure.
+  string markdown = 1;
+  string title = 2;
+  // Empty on success; otherwise a short error message for the user.
+  string error = 3;
+}
+
 message MakeShotListRequest {
   string article = 1;
 }
@@ -193,6 +206,7 @@ service AppService {
   rpc PickReferenceImage(PickReferenceImageRequest) returns (PickReferenceImageResponse);
   rpc SetAvatar(SetAvatarRequest) returns (SetAvatarResponse);
   rpc GetAvatar(GetAvatarRequest) returns (GetAvatarResponse);
+  rpc FetchArticle(FetchArticleRequest) returns (FetchArticleResponse);
   rpc MakeShotList(MakeShotListRequest) returns (MakeShotListResponse);
   rpc GetStyles(GetStylesRequest) returns (GetStylesResponse);
   rpc GetHistory(GetHistoryRequest) returns (GetHistoryResponse);
