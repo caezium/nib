@@ -3,6 +3,7 @@ import { Download, ImageIcon, Loader2, RefreshCw, Sparkles } from "lucide-react"
 import { ipc } from "@/gen/ipc"
 import type { Shot } from "@/gen/app"
 import { StylePicker, type StyleOption } from "@/components/style-picker"
+import { EXAMPLE_ARTICLES } from "@/lib/examples"
 import { cn } from "@/lib/utils"
 
 type ShotResult = {
@@ -123,6 +124,21 @@ export function ArticlePanel({
       {/* Article input */}
       {!hasShots && (
         <>
+          {!article.trim() && (
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
+              <span className="text-xs text-muted-foreground">Try an example:</span>
+              {EXAMPLE_ARTICLES.map((a, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => setArticle(a.body)}
+                  className="px-2.5 h-7 rounded-full text-xs font-medium border border-border bg-secondary/40 text-muted-foreground hover:text-foreground hover:bg-secondary/70 transition-colors"
+                >
+                  {a.title}
+                </button>
+              ))}
+            </div>
+          )}
           <textarea
             value={article}
             onChange={(e) => setArticle(e.target.value)}
