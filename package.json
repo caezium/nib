@@ -1,8 +1,19 @@
 {
-  "name": "sidekick-illustrator",
+  "name": "nib",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0",
   "type": "module",
+  "description": "Turn any idea or article into original white-background editorial illustrations starring an avatar you own.",
+  "license": "MIT",
+  "author": "Henry (caezium)",
+  "homepage": "https://nib.henryzh.dev",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/caezium/nib.git"
+  },
+  "bugs": {
+    "url": "https://github.com/caezium/nib/issues"
+  },
   "scripts": {
     "dev": "mobrowser dev",
     "dev:mock": "ICON_PROVIDER=mock mobrowser dev",

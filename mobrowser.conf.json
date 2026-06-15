@@ -6,7 +6,7 @@
       "minor": "1",
       "patch": "0"
     },
-    "author": "",
+    "author": "Henry (caezium)",
     "copyright": "© 2026 Henry. All rights reserved.",
     "description": "Turn any idea into a white-background hand-drawn illustration starring your own avatar.",
     "locales": ["en-US"],
@@ -14,7 +14,7 @@
     "bundle": {
       "macOS": {
         "icon": "assets/app.icns",
-        "bundleID": "com.henry.Sidekick",
+        "bundleID": "dev.henryzh.nib",
         "codesignIdentity": "${MAC_CODESIGN_IDENTITY}",
         "codesignEntitlements": "assets/entitlements.plist",
         "teamID": "${MAC_TEAM_ID}",
