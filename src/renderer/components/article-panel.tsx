@@ -22,10 +22,12 @@ export function ArticlePanel({
   style,
   styles,
   onStyleChange,
+  onZoom,
 }: {
   style: string
   styles: StyleOption[]
   onStyleChange: (id: string) => void
+  onZoom?: (src: string) => void
 }) {
   const [article, setArticle] = useState("")
   const [shots, setShots] = useState<Shot[]>([])
@@ -207,7 +209,13 @@ export function ArticlePanel({
                   {/* 16:9 image slot */}
                   <div className="relative w-[200px] shrink-0 aspect-[16/9] rounded-lg overflow-hidden bg-white flex items-center justify-center">
                     {r.image ? (
-                      <img src={r.image} alt={shot.theme} className="w-full h-full object-contain" draggable={false} />
+                      <img
+                        src={r.image}
+                        alt={shot.theme}
+                        className="w-full h-full object-contain cursor-zoom-in"
+                        draggable={false}
+                        onClick={() => onZoom?.(r.image!)}
+                      />
                     ) : r.status === "generating" ? (
                       <Loader2 className="w-6 h-6 text-muted-foreground animate-spin" />
                     ) : (

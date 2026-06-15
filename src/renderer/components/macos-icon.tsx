@@ -1,4 +1,4 @@
-import { ImageIcon } from "lucide-react"
+import { ImageIcon, Maximize2 } from "lucide-react"
 import type { IconState } from "@/components/icon-types"
 import { cn } from "@/lib/utils"
 
@@ -15,6 +15,7 @@ export function MacOSIcon({
   examples,
   onPickExample,
   showExamples,
+  onZoom,
 }: {
   state: IconState
   selected: number | null
@@ -26,41 +27,65 @@ export function MacOSIcon({
   onPickExample?: (text: string) => void
   /** When true (idle + empty prompt), show examples instead of the placeholder. */
   showExamples?: boolean
+  /** Open an image in the full-screen viewer. */
+  onZoom?: (src: string) => void
 }) {
-  // Refine: one large confirmed illustration.
+  // Refine: one large confirmed illustration (click to zoom).
   if (state === "refine") {
     return (
       <div className="w-full max-w-[620px]">
         <Frame>
           {baseIconSrc ? (
-            <img src={baseIconSrc} alt="Illustration" className="w-full h-full object-contain" draggable={false} />
+            <img
+              src={baseIconSrc}
+              alt="Illustration"
+              className="w-full h-full object-contain cursor-zoom-in"
+              draggable={false}
+              onClick={() => onZoom?.(baseIconSrc)}
+            />
           ) : null}
         </Frame>
       </div>
     )
   }
 
-  // Generated: up to three selectable variants.
+  // Generated: up to three selectable variants (hover to view larger).
   if (state === "generated") {
     const present = variants.map((v, i) => ({ v, i })).filter((x) => x.v !== null)
     return (
       <div className="flex flex-wrap items-center justify-center gap-4 w-full max-w-[680px]">
         {present.map(({ v, i }) => {
           const isSelected = selected === i
+          const src = v as string
           return (
-            <button
-              key={i}
-              type="button"
-              onClick={() => onSelect(i)}
-              className={cn(
-                "group relative w-[200px] rounded-xl transition-all duration-150 focus:outline-none",
-                isSelected ? "ring-2 ring-primary" : "ring-1 ring-border hover:ring-foreground/40"
+            <div key={i} className="relative group w-[200px]">
+              <button
+                type="button"
+                onClick={() => onSelect(i)}
+                className={cn(
+                  "block w-full rounded-xl transition-all duration-150 focus:outline-none",
+                  isSelected ? "ring-2 ring-primary" : "ring-1 ring-border hover:ring-foreground/40"
+                )}
+              >
+                <Frame small>
+                  <img src={src} alt={`Variant ${i + 1}`} className="w-full h-full object-contain" draggable={false} />
+                </Frame>
+              </button>
+              {onZoom && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onZoom(src)
+                  }}
+                  title="View larger"
+                  aria-label="View larger"
+                  className="absolute top-1.5 right-1.5 z-10 flex items-center justify-center w-7 h-7 rounded-md bg-black/55 text-white opacity-0 group-hover:opacity-100 hover:bg-black/75 transition-opacity"
+                >
+                  <Maximize2 className="w-3.5 h-3.5" />
+                </button>
               )}
-            >
-              <Frame small>
-                <img src={v as string} alt={`Variant ${i + 1}`} className="w-full h-full object-contain" draggable={false} />
-              </Frame>
-            </button>
+            </div>
           )
         })}
       </div>

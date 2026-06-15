@@ -3,6 +3,7 @@ import { Clock, Download, Info } from "lucide-react"
 import { MacOSIcon } from "@/components/macos-icon"
 import { HistoryPanel } from "@/components/history-panel"
 import { AboutModal } from "@/components/about-modal"
+import { Lightbox } from "@/components/lightbox"
 import {
   OpenAIApiKeyManageModal,
   OpenAIApiKeyStartupModal,
@@ -48,6 +49,8 @@ export function AppContent() {
   const [historyOpen, setHistoryOpen] = useState(false)
   // "More ways to use Nib" info modal.
   const [aboutOpen, setAboutOpen] = useState(false)
+  // Full-screen image viewer (null = closed).
+  const [lightbox, setLightbox] = useState<string | null>(null)
   // Single-concept vs whole-article batch mode.
   const [mode, setMode] = useState<"concept" | "article">("concept")
   // Look library + current selection.
@@ -398,6 +401,8 @@ export function AppContent() {
 
       {aboutOpen && <AboutModal onClose={() => setAboutOpen(false)} />}
 
+      <Lightbox src={lightbox} onClose={() => setLightbox(null)} />
+
       {mode === "concept" ? (
         <div className="flex flex-1 min-h-0 flex-col px-6 pt-16 pb-4 gap-4">
           {/* Preview fills the available space, vertically centered. */}
@@ -411,6 +416,7 @@ export function AppContent() {
               examples={EXAMPLE_PROMPTS}
               onPickExample={setPrompt}
               showExamples={iconState === "idle" && !prompt.trim()}
+              onZoom={setLightbox}
             />
           </div>
 
@@ -440,7 +446,12 @@ export function AppContent() {
           </div>
         </div>
       ) : (
-        <ArticlePanel style={selectedStyle} styles={styles} onStyleChange={setSelectedStyle} />
+        <ArticlePanel
+          style={selectedStyle}
+          styles={styles}
+          onStyleChange={setSelectedStyle}
+          onZoom={setLightbox}
+        />
       )}
     </div>
   )
