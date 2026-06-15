@@ -6,6 +6,12 @@ import { cn } from "@/lib/utils"
 const INSTALL_CMD = "npx skills add caezium/nib --skill nib"
 const REPO_URL = "https://github.com/caezium/nib"
 
+const AGENT_PROMPTS = [
+  'Use nib to illustrate: "small habits compound into a big result"',
+  "Use nib to illustrate this post: <paste a URL>",
+  'Use nib: set my avatar to avatar.png, then illustrate "<your idea>" in woodcut',
+]
+
 export function AboutModal({ onClose }: { onClose: () => void }) {
   const [copied, setCopied] = useState(false)
 
@@ -71,6 +77,15 @@ export function AboutModal({ onClose }: { onClose: () => void }) {
             <p className="text-[11px] text-muted-foreground mt-2">
               Uses your OpenRouter key · works the same as this app.
             </p>
+
+            <p className="text-[11px] font-medium text-foreground/80 mt-3 mb-1.5">
+              Then try a prompt:
+            </p>
+            <div className="space-y-1.5">
+              {AGENT_PROMPTS.map((p, i) => (
+                <CopyRow key={i} text={p} />
+              ))}
+            </div>
           </div>
 
           {/* Other features. */}
@@ -99,6 +114,32 @@ export function AboutModal({ onClose }: { onClose: () => void }) {
         </div>
       </div>
     </div>
+  )
+}
+
+/** A copyable prompt row. */
+function CopyRow({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false)
+  const copy = () => {
+    navigator.clipboard
+      .writeText(text)
+      .then(() => {
+        setCopied(true)
+        setTimeout(() => setCopied(false), 1500)
+      })
+      .catch(() => {})
+  }
+  return (
+    <button
+      type="button"
+      onClick={copy}
+      className="w-full flex items-center justify-between gap-2 rounded-lg bg-secondary/50 hover:bg-secondary border border-border px-2.5 py-2 text-left transition-colors"
+    >
+      <code className="font-mono text-[11px] text-foreground/90 truncate">{text}</code>
+      <span className="shrink-0 text-muted-foreground">
+        {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+      </span>
+    </button>
   )
 }
 

@@ -36,10 +36,13 @@ mockup.
 
 ## Workflow
 
-1. **Read the input.** A single idea → one illustration. An article/post →
-   first pick the **load-bearing moments** (a judgment, a flow, a before/after,
-   a trap, a loop), 4–8 of them. Not one image per paragraph — the ones that
-   matter.
+1. **Read the input.**
+   - A **URL** → fetch the page and extract the readable article text first
+     (use your web-fetch / Defuddle capability), then treat it as an article.
+   - A single **idea** → one illustration.
+   - An **article / post** → pick the **load-bearing moments** (a judgment, a
+     flow, a before/after, a trap, a loop), 4–8 of them. Not one image per
+     paragraph — the ones that matter.
 2. **Pick a look** for the piece (see `references/styles.md`): marker, riso,
    blueprint, woodcut, pixel, clay, gouache. One look per piece.
 3. For each idea, **invent a fresh, concrete physical metaphor** in which the
@@ -61,10 +64,21 @@ mockup.
    any that miss.
 6. Report each saved path.
 
+## Example prompts
+
+Invoke Nib from your agent like:
+
+- `Use nib to illustrate: "small habits compound into a big result"`
+- `Use nib to make illustrations for this article: https://jamesclear.com/feedback-loops`
+- `Use nib: set my avatar to ./avatar.png, then illustrate "saying no protects the few things that matter" in the woodcut style`
+- `Use nib to turn this post into a 5-image set in riso: <paste a URL or text>`
+
 ## Notes
 
 - Keep text in the image short; the model can misspell long labels.
 - The avatar is the reference on every call — that is what keeps the character
   consistent across a whole article.
+- For options, generate 2–3 variants of a shot (run the engine a few times with
+  the same idea) and let the user pick.
 - Cost: roughly a few cents per image via OpenRouter
   (`google/gemini-2.5-flash-image`), so a full post is well under a dollar.
