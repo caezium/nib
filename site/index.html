@@ -88,6 +88,14 @@
   .inst .k { font-weight: 700; font-size: 14px; margin-bottom: 8px; }
   .inst code { display: block; background: #f4f1ec; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; font-family: ui-monospace, Menlo, monospace; font-size: 13px; overflow-x: auto; white-space: pre; }
 
+  /* Try a prompt */
+  .prompts { display: grid; gap: 10px; margin-top: 24px; }
+  .prompt { text-align: left; width: 100%; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 13px 16px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 14px; font-family: inherit; transition: border-color .15s; }
+  .prompt:hover { border-color: var(--ink); }
+  .prompt code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13.5px; line-height: 1.5; color: var(--ink); background: none; }
+  .prompt .copy { color: var(--muted); font-size: 12px; flex-shrink: 0; }
+  .prompt:hover .copy { color: var(--accent); }
+
   footer { border-top: 1px solid var(--line); padding: 28px 0 48px; color: var(--muted); font-size: 14px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
   .toast { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--ink); color: #fff; padding: 10px 16px; border-radius: 10px; font-size: 14px; opacity: 0; transition: all .2s; pointer-events: none; }
   .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
@@ -119,17 +127,17 @@
   </section>
 
   <section class="gallery">
-    <!-- Swap each tile's <img src> with a real render per look. -->
     <div class="grid">
-      <div class="tile"><span class="tag">Marker</span></div>
-      <div class="tile"><span class="tag">Riso</span></div>
-      <div class="tile"><span class="tag">Blueprint</span></div>
-      <div class="tile"><span class="tag">Woodcut</span></div>
-      <div class="tile"><span class="tag">Pixel</span></div>
-      <div class="tile"><span class="tag">Clay</span></div>
-      <div class="tile"><span class="tag">Gouache</span></div>
-      <div class="tile"><span class="tag">Your avatar</span></div>
+      <div class="tile"><img src="gallery/marker.jpg" alt="Marker look — a chicken recruiting its first user" loading="lazy"><span class="tag">Marker</span></div>
+      <div class="tile"><img src="gallery/riso.jpg" alt="Riso look — your obvious idea is someone else's treasure" loading="lazy"><span class="tag">Riso</span></div>
+      <div class="tile"><img src="gallery/blueprint.jpg" alt="Blueprint look — a real shape that won't fit the rigid form" loading="lazy"><span class="tag">Blueprint</span></div>
+      <div class="tile"><img src="gallery/woodcut.jpg" alt="Woodcut look — two retired volunteers holding up the system" loading="lazy"><span class="tag">Woodcut</span></div>
+      <div class="tile"><img src="gallery/pixel.jpg" alt="Pixel look — ship it before you're ready, fix it in the open" loading="lazy"><span class="tag">Pixel</span></div>
+      <div class="tile"><img src="gallery/clay.jpg" alt="Clay look — saying no to protect the one yes that matters" loading="lazy"><span class="tag">Clay</span></div>
+      <div class="tile"><img src="gallery/gouache.jpg" alt="Gouache look — compounding is boring until it isn't" loading="lazy"><span class="tag">Gouache</span></div>
+      <div class="tile"><img src="gallery/avatar.jpg" alt="The avatar you bring" loading="lazy"><span class="tag">Your avatar →</span></div>
     </div>
+    <p class="note" style="text-align:center">One chicken, seven looks. Bring any character — it stays on-model across every image.</p>
   </section>
 
   <section id="how">
@@ -169,6 +177,17 @@
       <div class="inst"><div class="k">Gemini CLI</div><code>gemini extensions install caezium/nib</code></div>
     </div>
     <div class="note">Requires <code>python3</code> and an <code>OPENROUTER_API_KEY</code>. Prefer a desktop app? One is in the works.</div>
+  </section>
+
+  <section id="try">
+    <h2>Then just ask.</h2>
+    <p class="lead">Once it's installed, talk to your agent in plain English — no flags, no prompt-craft. Tap a prompt to copy it.</p>
+    <div class="prompts">
+      <button class="prompt" data-copy='Use nib to illustrate: "small habits compound into a big result"'><code>Use nib to illustrate: "small habits compound into a big result"</code><span class="copy">copy</span></button>
+      <button class="prompt" data-copy="Use nib to make illustrations for this article: https://paulgraham.com/ds.html"><code>Use nib to make illustrations for this article: &lt;paste a URL&gt;</code><span class="copy">copy</span></button>
+      <button class="prompt" data-copy='Use nib: set my avatar to ./avatar.png, then illustrate "saying no protects the few things that matter" in the woodcut style'><code>Use nib: set my avatar to ./avatar.png, then illustrate "…" in woodcut</code><span class="copy">copy</span></button>
+      <button class="prompt" data-copy="Use nib to turn this post into a 5-image set in riso: <paste a URL or text>"><code>Use nib to turn this post into a 5-image set in riso: &lt;URL or text&gt;</code><span class="copy">copy</span></button>
+    </div>
   </section>
 
   <footer>

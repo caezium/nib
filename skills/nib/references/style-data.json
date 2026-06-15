@@ -1,43 +1,43 @@
 {
   "_comment": "Canonical Nib style data — the single source of truth shared by the desktop app (src/main/lib/styles.ts and prompt-builder.ts import this file) and the skill engine (skills/nib/scripts/generate.py reads it at runtime). Edit here only; do not re-copy these strings elsewhere.",
-  "baseMethodology": "One standalone 16:9 horizontal illustration on a pure white background. Express ONE single idea with generous empty white space. The recurring character shown in the reference image is the subject and MUST physically perform the idea (pushing, sorting, steering, building, holding, fishing, patching, balancing, arranging) — never decoration; keep it clearly recognizable and consistent in shape, color, and proportions. Invent a fresh, concrete physical metaphor for this specific idea; do not default to bridge / funnel / roadmap. Use simple low-tech tactile props (boxes, tubes, buckets, pulleys, boards, levers, carts, wires). Keep the main subject around 40-60% of the canvas. At most a few very short handwritten labels (1-4 words each), only when useful; no title; never write the structure name on the image. It is not a photo, not a logo, not a corporate infographic, not a formal flowchart, and not a UI mockup.",
-  "negativePrompt": "photoreal render, 3D corporate render, glossy commercial vector style, PPT infographic, dense diagram, dashboard, children's-book look, cute plush mascot, emoji, sticker, logo, realistic UI, long sentences, paragraphs of text, watermark, multiple unrelated objects, clutter",
+  "baseMethodology": "One standalone 16:9 horizontal illustration on a pure white background. Express ONE single idea with generous empty white space. The recurring character shown in the reference image is the subject and MUST physically perform the idea (pushing, sorting, steering, building, holding, fishing, patching, balancing, arranging) — never decoration. Apply the erase test: if you mentally remove the character and the idea still reads, the scene is wrong — rebuild it so the action cannot happen without the character. Keep the character clearly recognizable and consistent in shape, color, and proportions; it may bend into the prop it needs (becoming a funnel, a box, a shadow, a hole) but stays the same character. Invent a fresh, concrete physical metaphor for this specific idea; do not default to bridge / funnel / roadmap. Use simple low-tech tactile props (boxes, tubes, buckets, pulleys, boards, levers, carts, wires, drawers, ladders, scales, gates). Render the character and every prop in the same single hand-made treatment so nothing looks pasted in from another artist. Give color a job rather than a mood: the linework and the character carry the base ink, and a bright accent is reserved for the one thing that matters most (a red for the problem or the result, an orange for the path or flow, a calm blue for an aside) — rather too few colors than too many. Keep the main subject around 40-60% of the canvas. At most a few very short handwritten labels (1-4 words each), only when useful; no title, no caption bar, never write the structure's name on the image. Aim for an image that reads as slightly odd for a beat, then snaps clear within a second. It is not a photo, not a logo, not a corporate infographic, not a formal flowchart, and not a UI mockup.",
+  "negativePrompt": "photoreal render, 3D corporate render, glossy commercial vector style, PPT infographic, dense diagram, dashboard, children's-book look, cute plush mascot, emoji, sticker, logo, realistic UI, long sentences, paragraphs of text, title bar, caption bar, framed border, legend, watermark, multiple unrelated objects, clutter",
   "defaultStyleId": "marker",
   "looks": [
     {
       "id": "marker",
       "label": "Marker",
-      "look": "Loose hand-drawn marker look: chunky, slightly wobbly dark-brown ink outlines, lightly imperfect edges, flat fills, a restrained warm palette with small red / orange / blue / mint accents. No gradients, no drop shadows, no texture."
+      "look": "Loose hand-drawn marker look: every element — the character, the props, the arrows, any underline — is drawn with the SAME chunky, slightly wobbly dark-brown marker line (never a clean line beside a scratchy one), with lightly imperfect edges and flat fills. A restrained warm palette with small red / orange / blue / mint accents used only where they carry meaning. Strange but clean and a little deadpan; no gradients, no drop shadows, no texture."
     },
     {
       "id": "riso",
       "label": "Riso",
-      "look": "Risograph print look: two or three flat spot colors, visible halftone grain, a slight ink-layer misregistration offset, soft rounded shapes, and a subtle paper grain over the white ground."
+      "look": "Risograph print look: two or three flat spot colors quantized (not blended), a visible halftone dot screen over the fills, and a slight ink-layer offset that leaves a thin colored edge beside the line — subtle, like real misregistration, not a glitch. Soft rounded shapes and a faint paper grain over the white ground."
     },
     {
       "id": "blueprint",
       "label": "Blueprint",
-      "look": "Technical blueprint look: thin, even blue line-work and annotations on white, faint construction lines, small measurement ticks and labelled callouts, no shading, monochrome blue with at most one sparing accent color."
+      "look": "Technical blueprint look: thin, even blue construction line-work and small annotations on white, faint guide lines, and up to a couple of small dimension ticks or measurement arrows. Monochrome blue with at most one sparing accent. No title block, no stamp, no border frame, no legend — leave off the blueprint clichés a model likes to add. No shading."
     },
     {
       "id": "woodcut",
       "label": "Woodcut",
-      "look": "Woodcut / linocut look: bold high-contrast carved black lines, chunky silhouettes, hatching and stipple for shade, one or two flat spot colors, and a hand-printed roughness on white."
+      "look": "Woodcut / linocut relief look: bold, high-contrast carved black shapes and outlines with slightly rough, chipped edges. Texture comes from visible carve marks and coarse parallel gouge lines inside the large fills — never from halftone dots. One or two flat spot colors, with the accent printed very slightly off-register (that small misalignment is correct, leave it). No gray midtones: every area is white paper, black ink, or the accent."
     },
     {
       "id": "pixel",
       "label": "Pixel",
-      "look": "Chunky pixel-art look: visible square pixels, a limited palette, blocky silhouettes with a clean dark outline, light dithering for shade, on a crisp white ground."
+      "look": "Chunky pixel-art look: every shape, including the character itself, is built from visible square pixels on one shared grid, with 1-pixel stair-stepped outlines and sparse dithering only where shade is needed. A tight palette of about four colors on a crisp white ground. Hard pixel edges everywhere — any smooth or anti-aliased curve is wrong."
     },
     {
       "id": "clay",
       "label": "Clay",
-      "look": "Soft clay / plasticine look: rounded matte 3D forms, gentle even lighting, a faint fingerprinted texture, a warm muted palette on white, and no harsh shadows."
+      "look": "Stop-motion clay look: every form, the character included, is smooth hand-modeled matte plasticine with softly rounded edges and a few faint fingerprint dents, lit by soft even studio light with small soft contact shadows on white. Shapes separate by color and gentle light rather than drawn outlines. A warm muted palette, with each accent hue named plainly so it doesn't drift to a toy default. Not a glossy 3D render — no plastic sheen, no photoreal depth blur."
     },
     {
       "id": "gouache",
       "label": "Gouache",
-      "look": "Gouache painting look: flat opaque brush shapes with soft visible brush edges, a slightly chalky matte color, a warm limited palette, and minimal shading on white."
+      "look": "Mid-century gouache look: flat, opaque, matte painted shapes with soft, slightly dry brush edges and one flat tone per shape — no drawn outlines, shapes separating by value and color with thin slivers of bare white paper left between neighbors. A warm limited palette, dry-brush texture only inside the larger fills, no gradients or blended shading."
     }
   ]
 }
