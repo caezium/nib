@@ -10,8 +10,14 @@ import { getResolvedApiKey, detectProviderFromKey } from "./openai-api-key";
 export interface GenerationRequest {
   positivePrompt: string;
   negativePrompt: string;
-  /** Base64-encoded PNG, no data URL prefix.  Omit for text-to-image. */
+  /** Base64-encoded image, no data URL prefix.  Omit for text-to-image. */
   referenceImageB64?: string;
+  /**
+   * MIME type of `referenceImageB64` (e.g. "image/png", "image/jpeg").
+   * Providers must honor this — sending a JPEG/WebP labeled as PNG makes
+   * OpenAI's /images/edits reject it. Defaults to image/png when omitted.
+   */
+  referenceImageMime?: string;
   /** Number of icon variants to generate. */
   count: number;
 }

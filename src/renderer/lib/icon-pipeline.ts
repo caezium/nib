@@ -20,14 +20,12 @@ export interface PipelineProgress {
 export interface IconPipeline {
   status: PipelineStatus
   progress: PipelineProgress
-  /** Up to 3 generated 16:9 PNG data-URLs (shown in the preview and saved as-is). */
-  variants: (string | null)[]
   /**
-   * Same images as `variants` — kept as a separate field so existing callers
-   * that distinguish "preview" from "save" data keep working. Illustrations are
-   * saved exactly as generated (no masking), so the two are identical.
+   * Up to 3 generated 16:9 PNG data-URLs, shown in the preview and saved exactly
+   * as generated. (The icon app kept a separate unmasked copy for .icns export;
+   * illustrations need no masking, so there is a single array now.)
    */
-  rawVariants: (string | null)[]
+  variants: (string | null)[]
   generate: (prompt: string, referenceDataUrl?: string, style?: string) => void
   cancel: () => void
   /** Load a past generation's variants into the preview (from history). */
@@ -36,7 +34,8 @@ export interface IconPipeline {
 
 // ── Blob/data URL → base64 helper ──────────────────────────────────────────
 
-async function blobUrlToBase64(url: string): Promise<string> {
+/** Decode a blob/data URL to raw base64 plus its MIME type (for the provider). */
+async function blobUrlToBase64(url: string): Promise<{ b64: string; mime: string }> {
   const response = await fetch(url)
   const blob = await response.blob()
   return new Promise((resolve, reject) => {
@@ -45,7 +44,8 @@ async function blobUrlToBase64(url: string): Promise<string> {
       const result = reader.result as string
       // Strip the "data:<mime>;base64," prefix.
       const comma = result.indexOf(",")
-      resolve(comma >= 0 ? result.slice(comma + 1) : result)
+      const b64 = comma >= 0 ? result.slice(comma + 1) : result
+      resolve({ b64, mime: blob.type || "image/png" })
     }
     reader.onerror = reject
     reader.readAsDataURL(blob)
@@ -58,7 +58,6 @@ export function useIconPipeline(): IconPipeline {
   const [status, setStatus] = useState<PipelineStatus>("idle")
   const [progress, setProgress] = useState<PipelineProgress>({ fraction: 0, label: "" })
   const [variants, setVariants] = useState<(string | null)[]>([null, null, null])
-  const [rawVariants, setRawVariants] = useState<(string | null)[]>([null, null, null])
 
   // Set when the user clicks Stop while a request is in flight.
   const cancelledRef = useRef(false)
@@ -70,16 +69,19 @@ export function useIconPipeline(): IconPipeline {
   const generate = useCallback(async (prompt: string, referenceDataUrl?: string, style?: string) => {
     cancelledRef.current = false
     setVariants([null, null, null])
-    setRawVariants([null, null, null])
     setStatus("generating")
     setProgress({ fraction: 0, label: "" })
 
     try {
-      // Convert an optional per-generation reference (blob/data URL) to raw base64.
+      // Convert an optional per-generation reference (blob/data URL) to raw
+      // base64, preserving its MIME so a non-PNG attachment isn't mislabeled.
       let referenceImage = ""
+      let referenceMime = ""
       if (referenceDataUrl) {
         try {
-          referenceImage = await blobUrlToBase64(referenceDataUrl)
+          const decoded = await blobUrlToBase64(referenceDataUrl)
+          referenceImage = decoded.b64
+          referenceMime = decoded.mime
         } catch {
           // Non-fatal: proceed without the extra reference image.
         }
@@ -97,6 +99,7 @@ export function useIconPipeline(): IconPipeline {
         seed: 0,
         variantCount: 0, // 0 = default (3)
         style: style ?? "",
+        referenceMime,
       })
 
       if (cancelledRef.current) {
@@ -116,7 +119,6 @@ export function useIconPipeline(): IconPipeline {
         next[i] = `data:image/png;base64,${response.images[i]}`
       }
       setVariants(next)
-      setRawVariants(next)
       setStatus("done")
       setProgress({ fraction: 1, label: "" })
     } catch (err) {
@@ -137,10 +139,9 @@ export function useIconPipeline(): IconPipeline {
     const next: (string | null)[] = [null, null, null]
     for (let i = 0; i < Math.min(dataUrls.length, 3); i++) next[i] = dataUrls[i]
     setVariants(next)
-    setRawVariants(next)
     setStatus("done")
     setProgress({ fraction: 1, label: "" })
   }, [])
 
-  return { status, progress, variants, rawVariants, generate, cancel, loadVariants }
+  return { status, progress, variants, generate, cancel, loadVariants }
 }

@@ -39,8 +39,8 @@ function chatConfig(apiKey: string): ChatConfig {
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${apiKey}`,
-        "HTTP-Referer": "https://github.com/caezium/sidekick-illustrator",
-        "X-Title": "Sidekick",
+        "HTTP-Referer": "https://github.com/caezium/nib",
+        "X-Title": "Nib",
       },
     };
   }

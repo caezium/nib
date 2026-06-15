@@ -1,0 +1,43 @@
+{
+  "_comment": "Canonical Nib style data — the single source of truth shared by the desktop app (src/main/lib/styles.ts and prompt-builder.ts import this file) and the skill engine (skills/nib/scripts/generate.py reads it at runtime). Edit here only; do not re-copy these strings elsewhere.",
+  "baseMethodology": "One standalone 16:9 horizontal illustration on a pure white background. Express ONE single idea with generous empty white space. The recurring character shown in the reference image is the subject and MUST physically perform the idea (pushing, sorting, steering, building, holding, fishing, patching, balancing, arranging) — never decoration; keep it clearly recognizable and consistent in shape, color, and proportions. Invent a fresh, concrete physical metaphor for this specific idea; do not default to bridge / funnel / roadmap. Use simple low-tech tactile props (boxes, tubes, buckets, pulleys, boards, levers, carts, wires). Keep the main subject around 40-60% of the canvas. At most a few very short handwritten labels (1-4 words each), only when useful; no title; never write the structure name on the image. It is not a photo, not a logo, not a corporate infographic, not a formal flowchart, and not a UI mockup.",
+  "negativePrompt": "photoreal render, 3D corporate render, glossy commercial vector style, PPT infographic, dense diagram, dashboard, children's-book look, cute plush mascot, emoji, sticker, logo, realistic UI, long sentences, paragraphs of text, watermark, multiple unrelated objects, clutter",
+  "defaultStyleId": "marker",
+  "looks": [
+    {
+      "id": "marker",
+      "label": "Marker",
+      "look": "Loose hand-drawn marker look: chunky, slightly wobbly dark-brown ink outlines, lightly imperfect edges, flat fills, a restrained warm palette with small red / orange / blue / mint accents. No gradients, no drop shadows, no texture."
+    },
+    {
+      "id": "riso",
+      "label": "Riso",
+      "look": "Risograph print look: two or three flat spot colors, visible halftone grain, a slight ink-layer misregistration offset, soft rounded shapes, and a subtle paper grain over the white ground."
+    },
+    {
+      "id": "blueprint",
+      "label": "Blueprint",
+      "look": "Technical blueprint look: thin, even blue line-work and annotations on white, faint construction lines, small measurement ticks and labelled callouts, no shading, monochrome blue with at most one sparing accent color."
+    },
+    {
+      "id": "woodcut",
+      "label": "Woodcut",
+      "look": "Woodcut / linocut look: bold high-contrast carved black lines, chunky silhouettes, hatching and stipple for shade, one or two flat spot colors, and a hand-printed roughness on white."
+    },
+    {
+      "id": "pixel",
+      "label": "Pixel",
+      "look": "Chunky pixel-art look: visible square pixels, a limited palette, blocky silhouettes with a clean dark outline, light dithering for shade, on a crisp white ground."
+    },
+    {
+      "id": "clay",
+      "label": "Clay",
+      "look": "Soft clay / plasticine look: rounded matte 3D forms, gentle even lighting, a faint fingerprinted texture, a warm muted palette on white, and no harsh shadows."
+    },
+    {
+      "id": "gouache",
+      "label": "Gouache",
+      "look": "Gouache painting look: flat opaque brush shapes with soft visible brush edges, a slightly chalky matte color, a warm limited palette, and minimal shading on white."
+    }
+  ]
+}

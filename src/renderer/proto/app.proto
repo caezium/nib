@@ -22,6 +22,8 @@ message SaveIconResponse {
   bool canceled = 2;
   // Full path to the saved .png file when the save succeeded.
   string image_path = 3;
+  // Empty on success or cancel; otherwise a short error message for the user.
+  string error = 4;
 }
 
 message ShowPathInFinderRequest {
@@ -40,6 +42,8 @@ message GenerateIconRequest {
   int32 variant_count = 5;
   // Look id (see GetStyles). Empty = default look.
   string style = 6;
+  // MIME type of reference_image (e.g. "image/jpeg"). Empty = image/png.
+  string reference_mime = 7;
 }
 
 message StyleInfo {

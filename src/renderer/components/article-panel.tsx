@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { Download, ImageIcon, Link2, Loader2, RefreshCw, Sparkles } from "lucide-react"
 import { ipc } from "@/gen/ipc"
 import type { Shot } from "@/gen/app"
@@ -9,6 +9,8 @@ import { cn } from "@/lib/utils"
 type ShotResult = {
   status: "idle" | "generating" | "done" | "error"
   image: string | null
+  /** True once this image has been exported to a file the user chose. */
+  saved?: boolean
 }
 
 /** Build the per-shot generation prompt from its idea + suggested labels. */
@@ -18,16 +20,38 @@ function shotPrompt(shot: Shot): string {
   return `${shot.coreIdea}${labels}`
 }
 
+/**
+ * Recognizable-as-a-URL heuristic for the single-line article input. Requires a
+ * scheme, `www.`, a host+path, or a common TLD — so a dotted idea like
+ * "feedback.loops" (no scheme/path/known TLD) is treated as text, not a page.
+ */
+function looksLikeUrl(s: string): boolean {
+  const t = s.trim()
+  if (!t || /\s/.test(t)) return false // articles have spaces; URLs don't
+  if (/^https?:\/\//i.test(t) || /^www\./i.test(t)) return true
+  if (/^[\w-]+(\.[\w-]+)+\/\S/.test(t)) return true // host + path
+  return /\.(com|org|net|io|dev|app|co|ai|edu|gov|news|blog|me|xyz|info|us|uk|ca)(\/|$|\?|#)/i.test(t)
+}
+
 export function ArticlePanel({
   style,
   styles,
   onStyleChange,
   onZoom,
+  avatarReady,
+  onNeedAvatar,
+  onDirtyChange,
 }: {
   style: string
   styles: StyleOption[]
   onStyleChange: (id: string) => void
   onZoom?: (src: string) => void
+  /** Whether the persistent avatar is set; generation is gated on it. */
+  avatarReady: boolean
+  /** Called when the user tries to generate without an avatar set. */
+  onNeedAvatar: () => void
+  /** Reports whether this panel holds generated-but-unsaved images. */
+  onDirtyChange: (dirty: boolean) => void
 }) {
   const [article, setArticle] = useState("")
   const [shots, setShots] = useState<Shot[]>([])
@@ -37,11 +61,10 @@ export function ArticlePanel({
   const [batchRunning, setBatchRunning] = useState(false)
   const [fetching, setFetching] = useState(false)
   const [fetchError, setFetchError] = useState<string | null>(null)
+  const [saveError, setSaveError] = useState<string | null>(null)
 
-  // Treat a single-line, space-free, dotted token as a URL to fetch.
   const trimmed = article.trim()
-  const isUrl =
-    trimmed.length > 0 && !/\s/.test(trimmed) && /\.[a-z]{2,}(\/|$|\?|#)/i.test(trimmed)
+  const isUrl = looksLikeUrl(trimmed)
 
   const fetchFromUrl = useCallback(
     async (urlOverride?: string) => {
@@ -92,6 +115,12 @@ export function ArticlePanel({
     async (i: number) => {
       const shot = shots[i]
       if (!shot) return
+      // Same avatar gate as concept mode — generating without the reference
+      // character would defeat the point.
+      if (!avatarReady) {
+        onNeedAvatar()
+        return
+      }
       setResult(i, { status: "generating", image: null })
       try {
         const res = await ipc.app.GenerateIcon({
@@ -101,37 +130,54 @@ export function ArticlePanel({
           seed: 0,
           variantCount: 1,
           style,
+          referenceMime: "",
         })
         if (res.error || res.images.length === 0) {
           setResult(i, { status: "error", image: null })
         } else {
-          setResult(i, { status: "done", image: `data:image/png;base64,${res.images[0]}` })
+          setResult(i, {
+            status: "done",
+            image: `data:image/png;base64,${res.images[0]}`,
+            saved: false,
+          })
         }
       } catch {
         setResult(i, { status: "error", image: null })
       }
     },
-    [shots, setResult, style]
+    [shots, setResult, style, avatarReady, onNeedAvatar]
   )
 
   const generateAll = useCallback(async () => {
     if (batchRunning || shots.length === 0) return
+    if (!avatarReady) {
+      onNeedAvatar()
+      return
+    }
     setBatchRunning(true)
     // Sequential to stay gentle on rate limits.
     for (let i = 0; i < shots.length; i++) {
       await generateOne(i)
     }
     setBatchRunning(false)
-  }, [batchRunning, shots, generateOne])
+  }, [batchRunning, shots, generateOne, avatarReady, onNeedAvatar])
 
   const save = useCallback(async (i: number) => {
     const img = results[i]?.image
     if (!img) return
+    setSaveError(null)
     try {
       const buffer = await (await fetch(img)).arrayBuffer()
-      await ipc.app.SaveIcon({ imageData: new Uint8Array(buffer) })
+      const res = await ipc.app.SaveIcon({ imageData: new Uint8Array(buffer) })
+      if (res.error) {
+        setSaveError(res.error)
+        return
+      }
+      if (!res.canceled && res.imagePath) {
+        setResults((prev) => prev.map((x, j) => (j === i ? { ...x, saved: true } : x)))
+      }
     } catch {
-      /* ignore */
+      setSaveError("Could not save the image.")
     }
   }, [results])
 
@@ -139,7 +185,16 @@ export function ArticlePanel({
     setShots([])
     setResults([])
     setPlanError(null)
+    setSaveError(null)
   }, [])
+
+  // Report unsaved generated images up so the app's quit guard covers an
+  // article batch; clear it when this panel unmounts (mode switch).
+  const hasUnsaved = results.some((r) => r.image && !r.saved)
+  useEffect(() => {
+    onDirtyChange(hasUnsaved)
+  }, [hasUnsaved, onDirtyChange])
+  useEffect(() => () => onDirtyChange(false), [onDirtyChange])
 
   const hasShots = shots.length > 0
 
@@ -254,6 +309,12 @@ export function ArticlePanel({
               </button>
             </div>
           </div>
+
+          {saveError && (
+            <p className="text-xs text-destructive shrink-0" role="alert">
+              {saveError}
+            </p>
+          )}
 
           <div className="flex-1 overflow-y-auto pr-1 space-y-3" style={{ scrollbarWidth: "thin" }}>
             {shots.map((shot, i) => {

@@ -59,7 +59,7 @@ import {
   clearHistory,
 } from './lib/history-store';
 
-const GITHUB_REPOSITORY_URL = 'https://github.com/caezium/sidekick-illustrator';
+const GITHUB_REPOSITORY_URL = 'https://github.com/caezium/nib';
 
 async function showAboutDialog() {
   const result = await app.showMessageDialog({
@@ -237,7 +237,7 @@ ipc.registerService(AppServiceDescriptor, {
     });
 
     if (pick.canceled || !pick.path) {
-      return { savedPath: '', canceled: true, imagePath: '' };
+      return { savedPath: '', canceled: true, imagePath: '', error: '' };
     }
 
     // Guarantee a .png extension.
@@ -248,11 +248,14 @@ ipc.registerService(AppServiceDescriptor, {
 
     try {
       await fs.writeFile(target, Buffer.from(request.imageData));
-      hasUnsavedIllustration = false;
-      return { savedPath: path.dirname(target), canceled: false, imagePath: target };
-    } catch {
-      // No error channel on this response; report as a non-save.
-      return { savedPath: '', canceled: false, imagePath: '' };
+      // The renderer clears its unsaved flag on a successful save (which syncs
+      // back via SetUnsavedIconState); the main process no longer flips the flag
+      // itself, so an Article-mode save can't silently clear a Concept-mode
+      // unsaved state.
+      return { savedPath: path.dirname(target), canceled: false, imagePath: target, error: '' };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return { savedPath: '', canceled: false, imagePath: '', error: `Could not save the file: ${message}` };
     }
   },
 
@@ -338,18 +341,28 @@ ipc.registerService(AppServiceDescriptor, {
     try {
       const { positive, negative } = buildPrompt(request.prompt, request.style);
       // The avatar is the persistent reference character; a per-generation
-      // reference image (if the user attached one) takes precedence.
-      const reference = request.referenceImage || getAvatarB64() || undefined;
+      // reference image (if the user attached one) takes precedence. The avatar
+      // carries its own MIME so a non-PNG avatar isn't mislabeled to the provider
+      // (which would make OpenAI's /images/edits reject it).
+      const perGenReference = request.referenceImage.trim();
+      const reference = perGenReference || getAvatarB64() || undefined;
+      // Honor the attachment's real MIME; fall back to the avatar's MIME when no
+      // per-generation reference was supplied.
+      const referenceMime = perGenReference
+        ? request.referenceMime.trim() || 'image/png'
+        : getAvatarMime();
       const count = request.variantCount > 0 ? request.variantCount : 3;
       const result = await getProvider().generate({
         positivePrompt: positive,
         negativePrompt: negative,
         referenceImageB64: reference,
+        referenceImageMime: referenceMime,
         count,
       });
-      // Save real generations to history (skip mock placeholders).
+      // Save real generations to history (skip mock placeholders). Awaited so
+      // the serialized index write finishes (and orders) before we return.
       if (result.images.length > 0 && resolveProviderName() !== 'mock') {
-        saveGeneration(request.prompt, request.style, result.images).catch(() => {});
+        await saveGeneration(request.prompt, request.style, result.images).catch(() => {});
       }
       return { images: result.images, error: '' };
     } catch (err) {

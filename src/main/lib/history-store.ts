@@ -37,11 +37,33 @@ async function writeIndex(entries: Entry[]): Promise<void> {
 }
 
 /**
+ * Serializes every write to the history (saveGeneration does a read-modify-write
+ * of index.json). Without this, two overlapping generations both read the same
+ * index snapshot and the second write clobbers the first, silently dropping
+ * entries — e.g. an Article "Generate all" batch fires its per-shot saves back
+ * to back. Chaining them guarantees each save sees the prior save's result.
+ */
+let writeChain: Promise<void> = Promise.resolve();
+
+/**
  * Persist a generation: writes each variant as a PNG plus a small thumbnail of
  * the first variant, appends an index entry, and prunes to MAX_ENTRIES.
- * Fire-and-forget from the caller — failures are non-fatal.
+ * Safe to call concurrently — writes are serialized; failures are non-fatal.
  */
-export async function saveGeneration(
+export function saveGeneration(
+  prompt: string,
+  style: string,
+  imagesB64: string[]
+): Promise<void> {
+  const task = writeChain.then(() =>
+    saveGenerationInner(prompt, style, imagesB64)
+  );
+  // Keep the chain alive even if this write rejects, so later writes still run.
+  writeChain = task.catch(() => {});
+  return task;
+}
+
+async function saveGenerationInner(
   prompt: string,
   style: string,
   imagesB64: string[]
@@ -104,7 +126,10 @@ export async function getHistoryItem(id: string): Promise<string[]> {
   const itemDir = path.join(historyDir(), id);
   const images: string[] = [];
   try {
-    const files = (await fs.readdir(itemDir)).filter((f) => /^v\d+\.png$/.test(f)).sort();
+    const files = (await fs.readdir(itemDir))
+      .filter((f) => /^v\d+\.png$/.test(f))
+      // Numeric sort so v10 follows v9 (a lexicographic sort would put v10 before v2).
+      .sort((a, b) => parseInt(a.slice(1), 10) - parseInt(b.slice(1), 10));
     for (const f of files) {
       images.push((await fs.readFile(path.join(itemDir, f))).toString('base64'));
     }

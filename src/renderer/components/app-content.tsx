@@ -30,13 +30,14 @@ export function AppContent() {
   const [attachments, setAttachments] = useState<string[]>([])
   const [selectedVariant, setSelectedVariant] = useState<number | null>(null)
   const [baseIconSrc, setBaseIconSrc] = useState<string | null>(null)
-  // Unmasked square version of baseIconSrc, used when writing the .icns file.
-  const [rawBaseIconSrc, setRawBaseIconSrc] = useState<string | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [saveSuccess, setSaveSuccess] = useState<{ folderPath: string; imagePath: string } | null>(
     null
   )
   const [iconDirty, setIconDirty] = useState(false)
+  // Unsaved illustrations also live in Article mode (a separate component). It
+  // reports its unsaved state up so the quit guard covers an unsaved batch too.
+  const [articleDirty, setArticleDirty] = useState(false)
   const [openAIApiKeyStartupOpen, setOpenAIApiKeyStartupOpen] = useState(false)
   const [openAIApiKeyManageReason, setOpenAIApiKeyManageReason] =
     useState<OpenAIApiKeyManageReason | null>(null)
@@ -60,6 +61,9 @@ export function AppContent() {
 
   const pipeline = useIconPipeline()
   const prevPipelineStatusRef = useRef(pipeline.status)
+  // Set just before loading a past generation so the "new generation → dirty"
+  // effect doesn't flag merely viewing history as unsaved work.
+  const suppressDirtyRef = useRef(false)
 
   useEffect(() => {
     ipc.app
@@ -126,14 +130,19 @@ export function AppContent() {
     prevPipelineStatusRef.current = pipeline.status
     if (pipeline.status !== "done") return
     if (!pipeline.variants.some((v) => v !== null)) return
+    if (suppressDirtyRef.current) {
+      // Loaded from history (already persisted on disk) — not unsaved work.
+      suppressDirtyRef.current = false
+      return
+    }
     if (was !== "done") {
       setIconDirty(true)
     }
   }, [pipeline.status, pipeline.variants])
 
   useEffect(() => {
-    ipc.app.SetUnsavedIconState({ unsaved: iconDirty }).catch(() => {})
-  }, [iconDirty])
+    ipc.app.SetUnsavedIconState({ unsaved: iconDirty || articleDirty }).catch(() => {})
+  }, [iconDirty, articleDirty])
 
   // Once the user is past onboarding, show "More ways to use Nib" a single time
   // so they discover the agent-skill / article / styles features.
@@ -174,7 +183,6 @@ export function AppContent() {
     if (iconState !== "generated" || selectedVariant === null) return
     setIconDirty(true)
     setBaseIconSrc(pipeline.variants[selectedVariant])
-    setRawBaseIconSrc(pipeline.rawVariants[selectedVariant])
     setIconState("refine")
     setSelectedVariant(null)
     setPrompt("")
@@ -185,9 +193,9 @@ export function AppContent() {
     // The chosen 16:9 illustration is saved exactly as generated.
     const src =
       iconState === "refine"
-        ? rawBaseIconSrc
+        ? baseIconSrc
         : selectedVariant !== null
-          ? pipeline.rawVariants[selectedVariant]
+          ? pipeline.variants[selectedVariant]
           : null
     if (!src) return
 
@@ -197,12 +205,16 @@ export function AppContent() {
       const buffer = await response.arrayBuffer()
       const imageData = new Uint8Array(buffer)
       const saved = await ipc.app.SaveIcon({ imageData })
+      if (saved.error) {
+        setErrorMessage(saved.error)
+        return
+      }
       if (!saved.canceled && saved.imagePath) {
         setIconDirty(false)
         setSaveSuccess({ folderPath: saved.savedPath, imagePath: saved.imagePath })
       }
     } catch {
-      // Silently ignore IPC errors.
+      setErrorMessage("Could not save the illustration.")
     }
   }
 
@@ -213,7 +225,11 @@ export function AppContent() {
         if (res.images.length === 0) return
         const urls = res.images.map((b) => `data:image/png;base64,${b}`)
         setMode("concept")
-        setSelectedVariant(null)
+        // Preselect a single-variant entry so Save works in one click; a
+        // multi-variant entry waits for the user to pick one.
+        setSelectedVariant(urls.length === 1 ? 0 : null)
+        // History items are already persisted — viewing one isn't unsaved work.
+        suppressDirtyRef.current = true
         pipeline.loadVariants(urls)
         setIconState("generated")
         setHistoryOpen(false)
@@ -259,7 +275,11 @@ export function AppContent() {
     startGeneration()
   }
 
-  const canSave = iconState === "refine" && rawBaseIconSrc != null
+  // Saveable in refine mode, or once a generated variant is selected (this also
+  // lets a loaded history item be saved straight away).
+  const canSave =
+    (iconState === "refine" && baseIconSrc != null) ||
+    (iconState === "generated" && selectedVariant !== null)
 
   const showStatus =
     pipeline.status === "downloading" && pipeline.progress.label !== ""
@@ -451,6 +471,9 @@ export function AppContent() {
           styles={styles}
           onStyleChange={setSelectedStyle}
           onZoom={setLightbox}
+          avatarReady={avatarReady}
+          onNeedAvatar={() => setAvatarModal("setup")}
+          onDirtyChange={setArticleDirty}
         />
       )}
     </div>

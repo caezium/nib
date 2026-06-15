@@ -49,7 +49,7 @@ export async function fetchArticle(
 
   // Defuddle prefixes a failed markdown conversion with this marker and dumps
   // raw HTML (e.g. ancient table/font layouts). Fall back to cleaned plain text.
-  if (!markdown || /^Partial conversion completed with errors/i.test(markdown) || /<[a-z][^>]*>/i.test(markdown.slice(0, 200))) {
+  if (!markdown || /^Partial conversion completed with errors/i.test(markdown) || looksLikeRawHtml(markdown)) {
     const cleaned = await Defuddle(html, url);
     const text = htmlToText(cleaned.content || '');
     if (text) markdown = text;
@@ -61,6 +61,19 @@ export async function fetchArticle(
     );
   }
   return { markdown, title: result.title || '' };
+}
+
+/**
+ * True when a "markdown" string is really a raw-HTML dump (Defuddle's failed
+ * conversion). Keyed on a density of real HTML *element* tags — markdown
+ * autolinks like `<https://…>` or `<a@b.com>` are not element tags and do not
+ * match, so a clean article that merely contains a link won't false-positive.
+ */
+function looksLikeRawHtml(markdown: string): boolean {
+  const tags = markdown.match(
+    /<\/?(div|p|table|tbody|thead|tr|td|th|span|font|center|ul|ol|li|h[1-6]|section|article|header|footer|nav|img|figure|blockquote|br)[\s/>]/gi
+  );
+  return (tags?.length ?? 0) >= 5;
 }
 
 /** Minimal HTML → plain text for the markdown-conversion fallback. */

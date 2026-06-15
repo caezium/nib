@@ -79,7 +79,7 @@ export class MockImageProvider implements ImageProvider {
     if (!mockProviderLogged) {
       mockProviderLogged = true;
       console.warn(
-        "[Sidekick] Mock image provider is active (no paid API calls). " +
+        "[Nib] Mock image provider is active (no paid API calls). " +
           "Unset ICON_PROVIDER or set ICON_PROVIDER=openai for real generation.",
       );
     }

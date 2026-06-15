@@ -19,8 +19,8 @@ const CHAT_COMPLETIONS_URL = "https://openrouter.ai/api/v1/chat/completions";
 const DEFAULT_MODEL = "google/gemini-2.5-flash-image";
 
 /** Optional attribution headers OpenRouter shows on its activity dashboard. */
-const REFERER = "https://github.com/caezium/sidekick-illustrator";
-const TITLE = "Sidekick";
+const REFERER = "https://github.com/caezium/nib";
+const TITLE = "Nib";
 
 /** Abort individual HTTP requests after this many milliseconds. */
 const REQUEST_TIMEOUT_MS = 90_000;
@@ -111,7 +111,8 @@ export class OpenRouterProvider implements ImageProvider {
           apiKey,
           model,
           request.positivePrompt,
-          request.referenceImageB64
+          request.referenceImageB64,
+          request.referenceImageMime
         )
       )
     );
@@ -142,7 +143,8 @@ export class OpenRouterProvider implements ImageProvider {
     apiKey: string,
     model: string,
     prompt: string,
-    referenceB64?: string
+    referenceB64?: string,
+    referenceMime?: string
   ): Promise<string> {
     return withRetry(async () => {
       const controller = new AbortController();
@@ -152,9 +154,10 @@ export class OpenRouterProvider implements ImageProvider {
         // For an edit, the reference image precedes the text instruction.
         const content: ChatImagePart[] | Array<Record<string, unknown>> = [];
         if (referenceB64) {
+          const mime = referenceMime?.trim() || "image/png";
           content.push({
             type: "image_url",
-            image_url: { url: `data:image/png;base64,${referenceB64}` },
+            image_url: { url: `data:${mime};base64,${referenceB64}` },
           });
         }
         content.push({ type: "text", text: prompt });

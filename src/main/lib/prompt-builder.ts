@@ -1,35 +1,22 @@
 import { resolveStyle } from "./styles";
+import styleData from "../../../skills/nib/references/style-data.json";
 
 /**
  * The house "methodology" — constant across every style. The avatar's identity
  * comes from the reference image; this fixes the rules of the picture. The
  * rendering *look* is supplied separately by the selected style (see styles.ts).
+ *
+ * The methodology and negative-prompt text live in the single canonical source
+ * `skills/nib/references/style-data.json` (read by the skill engine too); they
+ * are imported here rather than re-typed so the app and skill never drift.
  */
-const BASE_METHODOLOGY =
-  "One standalone 16:9 horizontal illustration on a pure white background. " +
-  "Express ONE single idea with generous empty white space. " +
-  "The recurring character shown in the reference image is the subject and MUST " +
-  "physically perform the idea (pushing, sorting, steering, building, holding, " +
-  "fishing, patching, balancing, arranging) — never decoration; keep it clearly " +
-  "recognizable and consistent in shape, color, and proportions. " +
-  "Invent a fresh, concrete physical metaphor for this specific idea; do not " +
-  "default to bridge / funnel / roadmap. Use simple low-tech tactile props " +
-  "(boxes, tubes, buckets, pulleys, boards, levers, carts, wires). " +
-  "Keep the main subject around 40-60% of the canvas. " +
-  "At most a few very short handwritten labels (1-4 words each), only when useful; " +
-  "no title; never write the structure name on the image. " +
-  "It is not a photo, not a logo, not a corporate infographic, not a formal " +
-  "flowchart, and not a UI mockup.";
+const BASE_METHODOLOGY: string = styleData.baseMethodology;
 
 /**
  * Things to steer away from. OpenAI / gemini image models rely mainly on the
  * positive prompt, so this is advisory for providers that accept it.
  */
-export const NEGATIVE_PROMPT =
-  "photoreal render, 3D corporate render, glossy commercial vector style, " +
-  "PPT infographic, dense diagram, dashboard, children's-book look, cute plush " +
-  "mascot, emoji, sticker, logo, realistic UI, long sentences, paragraphs of " +
-  "text, watermark, multiple unrelated objects, clutter";
+export const NEGATIVE_PROMPT: string = styleData.negativePrompt;
 
 export interface BuiltPrompt {
   positive: string;

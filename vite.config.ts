@@ -39,6 +39,9 @@ function defineMainConfig(): UserConfig {
       },
     },
     server: {
+      // styles.ts / prompt-builder.ts import the canonical style data from
+      // skills/nib/references/, which is outside this build root.
+      fs: { allow: [path.resolve(__dirname)] },
       forwardConsole: {
         unhandledErrors: true,
         logLevels: ['warn', 'error'],

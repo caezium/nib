@@ -27,6 +27,19 @@ interface ImageResponse {
   data: Array<{ b64_json: string }>;
 }
 
+/** File extension matching an image MIME type (for the multipart filename). */
+function extForMime(mime: string): string {
+  switch (mime.toLowerCase()) {
+    case "image/jpeg":
+    case "image/jpg":
+      return "jpg";
+    case "image/webp":
+      return "webp";
+    default:
+      return "png";
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Provider
 // ---------------------------------------------------------------------------
@@ -53,6 +66,7 @@ export class OpenAIProvider implements ImageProvider {
           apiKey,
           request.positivePrompt,
           request.referenceImageB64,
+          request.referenceImageMime,
           request.count
         )
       : await this.generateBatch(apiKey, request.positivePrompt, request.count);
@@ -111,6 +125,7 @@ export class OpenAIProvider implements ImageProvider {
     apiKey: string,
     prompt: string,
     referenceB64: string,
+    referenceMime: string | undefined,
     n: number
   ): Promise<string[]> {
     return withRetry(async () => {
@@ -122,6 +137,9 @@ export class OpenAIProvider implements ImageProvider {
 
       try {
         const imageBuffer = Buffer.from(referenceB64, "base64");
+        // Send the reference with its true type/extension. Labeling a JPEG or
+        // WebP as image/png makes /images/edits reject the upload.
+        const mime = referenceMime?.trim() || "image/png";
         const form = new FormData();
         form.append("model", "gpt-image-1");
         form.append("prompt", prompt);
@@ -130,8 +148,8 @@ export class OpenAIProvider implements ImageProvider {
         form.append("quality", "high");
         form.append(
           "image",
-          new Blob([imageBuffer], { type: "image/png" }),
-          "reference.png"
+          new Blob([imageBuffer], { type: mime }),
+          `reference.${extForMime(mime)}`
         );
 
         const res = await fetch(EDITS_URL, {
