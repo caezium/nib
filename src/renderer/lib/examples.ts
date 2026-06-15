@@ -11,6 +11,13 @@ export const EXAMPLE_PROMPTS: string[] = [
   "the last 20% takes 80% of the effort",
 ]
 
+/** Example article URLs to demo the fetch flow — all extract cleanly. */
+export const EXAMPLE_ARTICLE_URLS: { label: string; url: string }[] = [
+  { label: "Feedback loops · James Clear", url: "https://jamesclear.com/feedback-loops" },
+  { label: "Do things that don't scale · PG", url: "https://paulgraham.com/ds.html" },
+  { label: "The Feynman technique · fs.blog", url: "https://fs.blog/feynman-learning-technique/" },
+]
+
 /** Short sample posts for Article mode — each has several illustratable ideas. */
 export const EXAMPLE_ARTICLES: { title: string; body: string }[] = [
   {

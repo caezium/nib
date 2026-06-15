@@ -3,7 +3,7 @@ import { Download, ImageIcon, Link2, Loader2, RefreshCw, Sparkles } from "lucide
 import { ipc } from "@/gen/ipc"
 import type { Shot } from "@/gen/app"
 import { StylePicker, type StyleOption } from "@/components/style-picker"
-import { EXAMPLE_ARTICLES } from "@/lib/examples"
+import { EXAMPLE_ARTICLES, EXAMPLE_ARTICLE_URLS } from "@/lib/examples"
 import { cn } from "@/lib/utils"
 
 type ShotResult = {
@@ -43,20 +43,25 @@ export function ArticlePanel({
   const isUrl =
     trimmed.length > 0 && !/\s/.test(trimmed) && /\.[a-z]{2,}(\/|$|\?|#)/i.test(trimmed)
 
-  const fetchFromUrl = useCallback(async () => {
-    if (!isUrl || fetching) return
-    setFetching(true)
-    setFetchError(null)
-    try {
-      const res = await ipc.app.FetchArticle({ url: trimmed })
-      if (res.error) setFetchError(res.error)
-      else setArticle(res.markdown)
-    } catch {
-      setFetchError("Couldn't reach that page.")
-    } finally {
-      setFetching(false)
-    }
-  }, [isUrl, fetching, trimmed])
+  const fetchFromUrl = useCallback(
+    async (urlOverride?: string) => {
+      const url = (urlOverride ?? trimmed).trim()
+      if (!url || fetching) return
+      setArticle(url)
+      setFetching(true)
+      setFetchError(null)
+      try {
+        const res = await ipc.app.FetchArticle({ url })
+        if (res.error) setFetchError(res.error)
+        else setArticle(res.markdown)
+      } catch {
+        setFetchError("Couldn't reach that page.")
+      } finally {
+        setFetching(false)
+      }
+    },
+    [trimmed, fetching]
+  )
 
   const makeShotList = useCallback(async () => {
     if (!article.trim() || planning) return
@@ -159,6 +164,23 @@ export function ArticlePanel({
                   className="px-2.5 h-7 rounded-full text-xs font-medium border border-border bg-secondary/40 text-muted-foreground hover:text-foreground hover:bg-secondary/70 transition-colors"
                 >
                   {a.title}
+                </button>
+              ))}
+            </div>
+          )}
+          {!article.trim() && (
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
+              <span className="text-xs text-muted-foreground">Or fetch a URL:</span>
+              {EXAMPLE_ARTICLE_URLS.map((a, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  disabled={fetching}
+                  onClick={() => void fetchFromUrl(a.url)}
+                  className="flex items-center gap-1.5 px-2.5 h-7 rounded-full text-xs font-medium border border-border bg-secondary/40 text-muted-foreground hover:text-foreground hover:bg-secondary/70 transition-colors disabled:opacity-50"
+                >
+                  <Link2 className="w-3 h-3" />
+                  {a.label}
                 </button>
               ))}
             </div>
