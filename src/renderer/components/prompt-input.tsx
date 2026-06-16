@@ -1,4 +1,4 @@
-import { useEffect, useRef, type KeyboardEvent } from "react"
+import { useEffect, useRef, useState, type KeyboardEvent } from "react"
 import {
   ArrowUp,
   ChevronRight,
@@ -53,6 +53,19 @@ export function PromptInput({
   onOpenAvatarSettings: () => void
 }) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  // The character chip shows the avatar thumbnail when one is set.
+  const [avatarSrc, setAvatarSrc] = useState<string | null>(null)
+  useEffect(() => {
+    ipc.app
+      .GetAvatar({})
+      .then((r) => {
+        if (r.hasAvatar && r.imageB64) {
+          setAvatarSrc(`data:${r.mime || "image/png"};base64,${r.imageB64}`)
+        }
+      })
+      .catch(() => {})
+  }, [])
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -143,7 +156,7 @@ export function PromptInput({
             onClick={handleAttachClick}
             className={cn(
               "flex items-center justify-center w-8 h-8 rounded-full",
-              "text-muted-foreground hover:text-foreground hover:bg-white/10",
+              "text-muted-foreground hover:text-foreground hover:bg-foreground/5",
               "transition-colors shrink-0"
             )}
             title="Attach reference image"
@@ -156,14 +169,19 @@ export function PromptInput({
             type="button"
             onClick={onOpenAvatarSettings}
             className={cn(
-              "flex items-center justify-center w-8 h-8 rounded-full",
-              "text-muted-foreground hover:text-foreground hover:bg-white/10",
-              "transition-colors shrink-0"
+              "flex items-center justify-center w-8 h-8 shrink-0 overflow-hidden transition-all",
+              avatarSrc
+                ? "rounded-lg ring-1 ring-border hover:ring-foreground/40"
+                : "rounded-full text-muted-foreground hover:text-foreground hover:bg-foreground/5"
             )}
-            title="Change your avatar"
-            aria-label="Change your avatar"
+            title="Change your character"
+            aria-label="Change your character"
           >
-            <UserRound className="w-4 h-4" />
+            {avatarSrc ? (
+              <img src={avatarSrc} alt="Your character" className="w-full h-full object-cover" draggable={false} />
+            ) : (
+              <UserRound className="w-4 h-4" />
+            )}
           </button>
 
           <button
@@ -171,7 +189,7 @@ export function PromptInput({
             onClick={onOpenApiKeySettings}
             className={cn(
               "flex items-center justify-center w-8 h-8 rounded-full",
-              "text-muted-foreground hover:text-foreground hover:bg-white/10",
+              "text-muted-foreground hover:text-foreground hover:bg-foreground/5",
               "transition-colors shrink-0"
             )}
             title="API key"

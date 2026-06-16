@@ -36,7 +36,7 @@ export function Lightbox({ src, onClose }: { src: string | null; onClose: () => 
         type="button"
         onClick={onClose}
         aria-label="Close"
-        className="fixed top-4 right-4 z-10 flex items-center justify-center w-9 h-9 rounded-lg bg-white/10 text-white hover:bg-white/20 transition-colors"
+        className="fixed top-4 right-4 z-10 flex items-center justify-center w-9 h-9 rounded-lg bg-foreground/5 text-white hover:bg-white/20 transition-colors"
       >
         <X className="w-5 h-5" />
       </button>

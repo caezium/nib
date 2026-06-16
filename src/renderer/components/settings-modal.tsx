@@ -94,7 +94,7 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
           <button
             type="button"
             onClick={onClose}
-            className="flex items-center justify-center h-8 w-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-white/10 transition-colors"
+            className="flex items-center justify-center h-8 w-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-foreground/5 transition-colors"
             aria-label="Close"
           >
             <X className="w-4 h-4" />
@@ -186,7 +186,7 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
                     ? "bg-muted cursor-wait"
                     : telemetryOn
                       ? "bg-primary"
-                      : "bg-secondary border border-border"
+                      : "bg-foreground/20"
                 )}
               >
                 <span

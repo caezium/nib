@@ -322,7 +322,7 @@ export function AppContent() {
     pipeline.status === "downloading" && pipeline.progress.label !== ""
 
   return (
-    <div className="dark flex flex-col h-screen bg-background text-foreground overflow-hidden">
+    <div className="flex flex-col h-screen bg-background text-foreground overflow-hidden">
       {errorMessage && (
         <ErrorModal
           message={errorMessage}
@@ -374,10 +374,21 @@ export function AppContent() {
       {/* macOS traffic-light spacer (also serves as the drag region). */}
       <div className="draggable" />
 
+      {/* Brand mark — top-left, clear of the traffic lights. */}
+      <div className="absolute top-3.5 left-20 z-50 flex items-center gap-1.5 non-draggable select-none">
+        <span className="relative inline-block w-3.5 h-3.5 rounded-[5px] bg-foreground">
+          <span
+            className="absolute -right-0.5 -bottom-0.5 w-1.5 h-1.5 rounded-full"
+            style={{ background: "var(--brand)" }}
+          />
+        </span>
+        <span className="text-sm font-semibold tracking-tight">Nib</span>
+      </div>
+
       {/* Mock-mode badge — placeholder images, no API calls. */}
       {mockMode && (
-        <div className="absolute top-3 left-24 z-50 non-draggable">
-          <span className="inline-flex items-center h-6 px-2 rounded-md text-[11px] font-medium bg-amber-500/15 text-amber-400 border border-amber-500/30">
+        <div className="absolute top-3 left-44 z-50 non-draggable">
+          <span className="inline-flex items-center h-6 px-2 rounded-md text-[11px] font-medium bg-amber-500/15 text-amber-700 border border-amber-500/30">
             Mock mode · placeholder images
           </span>
         </div>
@@ -420,7 +431,7 @@ export function AppContent() {
           onClick={() => setSettingsOpen(true)}
           title="Settings"
           aria-label="Settings"
-          className="flex items-center justify-center w-8 h-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-white/10 transition-colors"
+          className="flex items-center justify-center w-8 h-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-foreground/5 transition-colors"
         >
           <Settings className="w-4 h-4" />
         </button>
@@ -429,7 +440,7 @@ export function AppContent() {
           onClick={() => setAboutOpen(true)}
           title="More ways to use Nib"
           aria-label="More ways to use Nib"
-          className="flex items-center justify-center w-8 h-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-white/10 transition-colors"
+          className="flex items-center justify-center w-8 h-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-foreground/5 transition-colors"
         >
           <Info className="w-4 h-4" />
         </button>
@@ -438,7 +449,7 @@ export function AppContent() {
           onClick={() => setHistoryOpen(true)}
           title="History"
           aria-label="History"
-          className="flex items-center justify-center w-8 h-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-white/10 transition-colors"
+          className="flex items-center justify-center w-8 h-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-foreground/5 transition-colors"
         >
           <Clock className="w-4 h-4" />
         </button>

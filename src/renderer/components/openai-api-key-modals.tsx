@@ -233,7 +233,7 @@ export function OpenAIApiKeyManageModal({
           onClick={() => onClose(false)}
           className={cn(
             "flex items-center justify-center h-8 w-8 rounded-md",
-            "text-muted-foreground hover:text-foreground hover:bg-white/10 transition-colors",
+            "text-muted-foreground hover:text-foreground hover:bg-foreground/5 transition-colors",
             "disabled:opacity-50 disabled:pointer-events-none"
           )}
           aria-label="Close"

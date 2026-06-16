@@ -102,8 +102,8 @@ async function showAboutDialog() {
   }
 }
 
-// Set the theme to dark by default.
-app.setTheme('dark');
+// Editorial light theme to match the app's paper aesthetic.
+app.setTheme('light');
 
 // Anonymous, opt-out telemetry (usage events + crash reports).
 initTelemetry(resolveProviderName());

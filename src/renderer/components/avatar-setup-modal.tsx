@@ -129,7 +129,7 @@ export function AvatarSetupModal({
             <button
               type="button"
               onClick={onClose}
-              className="flex items-center justify-center h-8 w-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-white/10 transition-colors"
+              className="flex items-center justify-center h-8 w-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-foreground/5 transition-colors"
               aria-label="Close"
             >
               <X className="w-4 h-4" />

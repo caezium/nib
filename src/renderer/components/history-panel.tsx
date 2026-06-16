@@ -61,7 +61,7 @@ export function HistoryPanel({
                 type="button"
                 onClick={clear}
                 title="Clear history"
-                className="flex items-center justify-center w-7 h-7 rounded-md text-muted-foreground hover:text-destructive hover:bg-white/10 transition-colors"
+                className="flex items-center justify-center w-7 h-7 rounded-md text-muted-foreground hover:text-destructive hover:bg-foreground/5 transition-colors"
               >
                 <Trash2 className="w-4 h-4" />
               </button>
@@ -69,7 +69,7 @@ export function HistoryPanel({
             <button
               type="button"
               onClick={onClose}
-              className="flex items-center justify-center w-7 h-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-white/10 transition-colors"
+              className="flex items-center justify-center w-7 h-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-foreground/5 transition-colors"
             >
               <X className="w-4 h-4" />
             </button>

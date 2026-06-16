@@ -36,7 +36,7 @@ export function SaveSuccessModal({
           <span className="text-sm font-medium text-foreground">Illustration saved</span>
           <button
             onClick={onClose}
-            className="flex items-center justify-center w-6 h-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-white/10 transition-colors"
+            className="flex items-center justify-center w-6 h-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-foreground/5 transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
