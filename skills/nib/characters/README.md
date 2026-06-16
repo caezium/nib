@@ -12,8 +12,11 @@ python3 skills/nib/scripts/generate.py --avatar-pack blip \
 
 | pack | who |
 | --- | --- |
-| `blip` | a deadpan little ink-drop with a red spark of an idea |
-| `pip`  | a round seed sprouting a small idea-leaf |
+| `blip`  | a deadpan little ink-drop with a red spark of an idea |
+| `pip`   | a round seed sprouting a small idea-leaf |
+| `hen`   | a chunky white hen with a red comb |
+| `mo`    | a small mole with a red scarf |
+| `scout` | an origami paper bird with a red crest |
 
 ## Add your own (PRs welcome — this is the whole contribution)
 

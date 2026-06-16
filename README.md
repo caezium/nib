@@ -11,7 +11,7 @@ reference on every generation, it stays on-model across an entire piece.
 
 <p>
   <img src="site/gallery/marker.jpg" width="32%" alt="marker look" />
-  <img src="site/gallery/clay.jpg" width="32%" alt="clay look" />
+  <img src="site/gallery/riso.jpg" width="32%" alt="riso look" />
   <img src="site/gallery/woodcut.jpg" width="32%" alt="woodcut look" />
 </p>
 
