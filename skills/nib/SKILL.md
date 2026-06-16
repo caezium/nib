@@ -82,3 +82,6 @@ Invoke Nib from your agent like:
   the same idea) and let the user pick.
 - Cost: roughly a few cents per image via OpenRouter
   (`google/gemini-2.5-flash-image`), so a full post is well under a dollar.
+- Inspired by [xiaohei (小黑)](https://github.com/helloianneo/ian-xiaohei-illustrations)
+  by helloianneo — this methodology is an adaptation of its hand-drawn editorial
+  approach, reworded in Nib's own voice.

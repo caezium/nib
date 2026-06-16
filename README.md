@@ -84,7 +84,7 @@ and are read by **both** the skill engine and the desktop app, so they never dri
 
 ## The desktop app
 
-A [MōBrowser](https://teamdev.com/mobrowser/) (TypeScript + React) desktop app.
+A TypeScript + React desktop app.
 
 ```sh
 npm install            # first time
@@ -108,6 +108,12 @@ whether a generation succeeded or failed) and crash reports, so bugs get fixed a
 roadmap reflects real use. It **never** sends your prompts, your avatar, your API keys,
 or any generated image. You can turn it off anytime under **Settings → Telemetry**.
 The **agent skill** sends no telemetry at all.
+
+## Credits
+
+Nib's house methodology is adapted from **[xiaohei (小黑)](https://github.com/helloianneo/ian-xiaohei-illustrations)**
+by [helloianneo](https://github.com/helloianneo) — the hand-drawn editorial-illustration
+skill that inspired this project. Nib reimplements its approach in its own words and code.
 
 ## License
 
