@@ -13,7 +13,6 @@ metadata:
   category: creative
   requires:
     bins: [python3]
-    env: [OPENROUTER_API_KEY]
 ---
 
 # Nib
@@ -30,9 +29,15 @@ mockup.
 
 ## Setup (once)
 
-1. The user provides an **avatar image** (a mascot, logo character, any
-   character). Save its path; it is the reference for every generation.
-2. An **`OPENROUTER_API_KEY`** must be in the environment (an `sk-or-…` key).
+1. **A character.** Either the user's own **avatar image** (a mascot, logo
+   character, anything — save its path), *or* a bundled one via
+   `--avatar-pack <name>` (see `characters/`). The character is the reference on
+   every generation.
+2. **A backend** — one of:
+   - **Codex (free)** — a logged-in Codex CLI (`codex login`). Generates on the
+     user's ChatGPT / Codex subscription, no API key. *Default when no key is set.*
+   - **OpenRouter** — an `OPENROUTER_API_KEY` (`sk-or-…`). Exact 16:9, and lets
+     you pick the model with `--model`.
 
 ## Workflow
 
@@ -57,8 +62,16 @@ mockup.
      --out ./out/trust.png
    ```
 
-   It builds the full prompt (methodology + look + idea), sends the avatar as
-   the reference for character consistency, and writes a 16:9 PNG.
+   It builds the full prompt (methodology + look + idea), sends the character as
+   the reference for consistency, and writes a 16:9 PNG. Useful flags:
+   - `--backend auto|openrouter|codex` — `auto` uses the OpenRouter key if set,
+     else the free Codex lane.
+   - `--model <id>` — OpenRouter image model (default `google/gemini-2.5-flash-image`).
+   - `--avatar-pack <name>` — use a bundled character (see `characters/`) instead
+     of `--avatar`.
+   - `--avatar-spec "<text>"` — a written description of the character (silhouette,
+     face, the one accent part) that locks its design. Combine with the image —
+     it markedly improves consistency.
 5. **Review** against `references/quality-bar.md` (white background, one idea,
    avatar performing the action, short labels only, not a slide). Regenerate
    any that miss.
@@ -80,8 +93,11 @@ Invoke Nib from your agent like:
   consistent across a whole article.
 - For options, generate 2–3 variants of a shot (run the engine a few times with
   the same idea) and let the user pick.
-- Cost: roughly a few cents per image via OpenRouter
-  (`google/gemini-2.5-flash-image`), so a full post is well under a dollar.
+- Cost: **free** on the Codex lane (uses the user's ChatGPT / Codex subscription),
+  or a few cents per image on OpenRouter (`google/gemini-2.5-flash-image`) — a full
+  post is well under a dollar either way.
+- A written **`--avatar-spec`** (describe the character in words) markedly improves
+  consistency over the image reference alone — use it whenever you have a description.
 - Inspired by [xiaohei (小黑)](https://github.com/helloianneo/ian-xiaohei-illustrations)
   by helloianneo — this methodology is an adaptation of its hand-drawn editorial
   approach, reworded in Nib's own voice.
