@@ -77,11 +77,15 @@ export function AppContent() {
           openai_key_required?: boolean
           hasOpenaiKey?: boolean
           has_openai_key?: boolean
+          isMock?: boolean
+          is_mock?: boolean
         }
         const required = resp.openaiKeyRequired ?? resp.openai_key_required
         const hasKey = resp.hasOpenaiKey ?? resp.has_openai_key
-        // A key is required for every real provider; only mock needs none.
-        setMockMode(required === false)
+        const isMock = resp.isMock ?? resp.is_mock ?? false
+        // Only the mock provider shows the placeholder badge — Codex (free sub)
+        // also needs no key but is real generation.
+        setMockMode(isMock)
         if (required === true && hasKey !== true) {
           setOpenAIApiKeyStartupOpen(true)
         }

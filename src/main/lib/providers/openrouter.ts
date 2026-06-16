@@ -5,18 +5,13 @@ import type {
 } from "../image-provider";
 import { withRetry } from "../image-provider";
 import { getResolvedApiKey } from "../openai-api-key";
+import { getOpenRouterModel } from "../app-settings";
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
 const CHAT_COMPLETIONS_URL = "https://openrouter.ai/api/v1/chat/completions";
-
-/**
- * Default image model. "Nano Banana" — supports text-to-image, image editing
- * (reference image), and 1:1 aspect ratio. Override with OPENROUTER_MODEL.
- */
-const DEFAULT_MODEL = "google/gemini-2.5-flash-image";
 
 /** Optional attribution headers OpenRouter shows on its activity dashboard. */
 const REFERER = "https://github.com/caezium/nib";
@@ -101,7 +96,7 @@ export class OpenRouterProvider implements ImageProvider {
       );
     }
 
-    const model = process.env.OPENROUTER_MODEL?.trim() || DEFAULT_MODEL;
+    const model = getOpenRouterModel();
     const count = Math.max(1, request.count);
 
     // One image per request → fire `count` requests concurrently.

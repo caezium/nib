@@ -50,6 +50,7 @@ export function AvatarSetupModal({
 }) {
   const [imageB64, setImageB64] = useState("")
   const [mime, setMime] = useState("image/png")
+  const [spec, setSpec] = useState("")
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -62,6 +63,8 @@ export function AvatarSetupModal({
           setImageB64(r.imageB64)
           setMime(r.mime || "image/png")
         }
+        const sp = (r as unknown as { spec?: string }).spec
+        if (sp) setSpec(sp)
       })
       .catch(() => {})
   }, [])
@@ -94,17 +97,19 @@ export function AvatarSetupModal({
     setError(null)
     try {
       const res = await ipc.app.SetAvatar({ imageB64, mime })
-      setBusy(false)
       if (res.error) {
+        setBusy(false)
         setError(res.error)
         return
       }
+      await ipc.app.SetAvatarSpec({ spec }).catch(() => {})
+      setBusy(false)
       onSaved()
     } catch {
       setBusy(false)
       setError("Could not save the avatar.")
     }
-  }, [imageB64, mime, onSaved])
+  }, [imageB64, mime, spec, onSaved])
 
   const preview = imageB64 ? `data:${mime};base64,${imageB64}` : null
 
@@ -172,6 +177,27 @@ export function AvatarSetupModal({
               Choose a different image
             </button>
           )}
+
+          <div>
+            <label
+              htmlFor="avatar-spec"
+              className="block text-xs font-medium text-foreground mb-1.5"
+            >
+              Describe your character{" "}
+              <span className="text-muted-foreground font-normal">(optional)</span>
+            </label>
+            <textarea
+              id="avatar-spec"
+              value={spec}
+              onChange={(e) => setSpec(e.target.value)}
+              rows={3}
+              placeholder="e.g. a round white hen with a small red comb, two dot eyes and stubby wings — keep the red comb in every image"
+              className="w-full rounded-lg border border-border bg-secondary/20 px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground/60 outline-none focus:border-foreground/40 resize-none leading-relaxed"
+            />
+            <p className="text-[11px] text-muted-foreground mt-1">
+              A short written description locks the character's design tighter than the image alone.
+            </p>
+          </div>
 
           {error && (
             <p className="text-xs text-destructive" role="alert">

@@ -66,10 +66,12 @@ message GenerateIconResponse {
 message GetOpenAIApiKeyStatusRequest {}
 
 message GetOpenAIApiKeyStatusResponse {
-  // True when the OpenAI provider is active (a stored API key is required).
+  // True when a stored API key is required for the active backend.
   bool openai_key_required = 1;
-  // True when a non-empty OpenAI API key is already stored in preferences.
+  // True when a non-empty API key is already stored in preferences.
   bool has_openai_key = 2;
+  // True when the mock (placeholder) provider is active.
+  bool is_mock = 3;
 }
 
 message SetOpenAIApiKeyRequest {
@@ -127,6 +129,12 @@ message GetAvatarResponse {
   string image_b64 = 1;
   string mime = 2;
   bool has_avatar = 3;
+  // Optional written description of the character (locks its design).
+  string spec = 4;
+}
+
+message SetAvatarSpecRequest {
+  string spec = 1;
 }
 
 // --- Generation history ---
@@ -218,6 +226,28 @@ message ReportRendererErrorRequest {
   string source = 3;
 }
 
+// --- Image settings (which backend + which model) ---
+
+message GetImageSettingsRequest {}
+
+message GetImageSettingsResponse {
+  // auto | openrouter | openai | codex | mock
+  string backend = 1;
+  // OpenRouter image model id.
+  string model = 2;
+  // True when the Codex CLI (the free, no-key lane) is available.
+  bool codex_available = 3;
+  // True when an API key is stored (the OpenRouter / OpenAI lanes need one).
+  bool has_key = 4;
+  // Suggested OpenRouter models for the picker.
+  repeated string suggested_models = 5;
+}
+
+message SetImageSettingsRequest {
+  string backend = 1;
+  string model = 2;
+}
+
 service AppService {
   rpc SetTheme(SetThemeRequest) returns (google.protobuf.Empty);
   rpc SetUnsavedIconState(SetUnsavedIconStateRequest) returns (google.protobuf.Empty);
@@ -240,4 +270,7 @@ service AppService {
   rpc GetTelemetryOptOut(GetTelemetryOptOutRequest) returns (GetTelemetryOptOutResponse);
   rpc SetTelemetryOptOut(SetTelemetryOptOutRequest) returns (google.protobuf.Empty);
   rpc ReportRendererError(ReportRendererErrorRequest) returns (google.protobuf.Empty);
+  rpc GetImageSettings(GetImageSettingsRequest) returns (GetImageSettingsResponse);
+  rpc SetImageSettings(SetImageSettingsRequest) returns (google.protobuf.Empty);
+  rpc SetAvatarSpec(SetAvatarSpecRequest) returns (google.protobuf.Empty);
 }

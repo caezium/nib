@@ -38,6 +38,10 @@ import {
   GetTelemetryOptOutResponse,
   SetTelemetryOptOutRequest,
   ReportRendererErrorRequest,
+  GetImageSettingsRequest,
+  GetImageSettingsResponse,
+  SetImageSettingsRequest,
+  SetAvatarSpecRequest,
 } from './gen/app';
 import { AppServiceDescriptor } from './gen/ipc_service';
 import { buildPrompt } from './lib/prompt-builder';
@@ -53,7 +57,17 @@ import {
   getAvatarMime,
   hasAvatar,
   setAvatar,
+  getAvatarSpec,
+  setAvatarSpec,
 } from './lib/avatar-store';
+import {
+  getBackendSetting,
+  setBackendSetting,
+  getOpenRouterModel,
+  setOpenRouterModel,
+  codexAvailable,
+  SUGGESTED_MODELS,
+} from './lib/app-settings';
 import { makeShotList } from './lib/shot-list';
 import { fetchArticle } from './lib/fetch-article';
 import {
@@ -351,6 +365,7 @@ ipc.registerService(AppServiceDescriptor, {
       imageB64: getAvatarB64(),
       mime: getAvatarMime(),
       hasAvatar: hasAvatar(),
+      spec: getAvatarSpec(),
     };
   },
 
@@ -358,7 +373,7 @@ ipc.registerService(AppServiceDescriptor, {
     const startedAt = Date.now();
     const provider = resolveProviderName();
     try {
-      const { positive, negative } = buildPrompt(request.prompt, request.style);
+      const { positive, negative } = buildPrompt(request.prompt, request.style, getAvatarSpec());
       // The avatar is the persistent reference character; a per-generation
       // reference image (if the user attached one) takes precedence. The avatar
       // carries its own MIME so a non-PNG avatar isn't mislabeled to the provider
@@ -475,9 +490,12 @@ ipc.registerService(AppServiceDescriptor, {
   ): Promise<GetOpenAIApiKeyStatusResponse> {
     // A key is required for any real image provider (OpenAI or OpenRouter);
     // only the mock provider needs none.
+    const name = resolveProviderName();
     return {
-      openaiKeyRequired: resolveProviderName() !== 'mock',
+      // The Codex (free sub) and mock lanes need no API key.
+      openaiKeyRequired: name !== 'mock' && name !== 'codex',
       hasOpenaiKey: hasApiKeyInPrefs(),
+      isMock: name === 'mock',
     };
   },
 
@@ -518,6 +536,29 @@ ipc.registerService(AppServiceDescriptor, {
     const err = new Error(request.message || 'Renderer error');
     if (request.stack) err.stack = request.stack;
     captureError(err, { scope: 'renderer', source: request.source });
+    return {};
+  },
+
+  async GetImageSettings(
+    _request: GetImageSettingsRequest
+  ): Promise<GetImageSettingsResponse> {
+    return {
+      backend: getBackendSetting(),
+      model: getOpenRouterModel(),
+      codexAvailable: codexAvailable(),
+      hasKey: hasApiKeyInPrefs(),
+      suggestedModels: SUGGESTED_MODELS,
+    };
+  },
+
+  async SetImageSettings(request: SetImageSettingsRequest) {
+    if (request.backend) setBackendSetting(request.backend);
+    if (request.model) setOpenRouterModel(request.model);
+    return {};
+  },
+
+  async SetAvatarSpec(request: SetAvatarSpecRequest) {
+    setAvatarSpec(request.spec);
     return {};
   },
 });

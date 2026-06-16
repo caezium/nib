@@ -6,6 +6,7 @@ import { prefs } from '@mobrowser/api';
  */
 const AVATAR_B64_KEY = 'avatar.imageB64';
 const AVATAR_MIME_KEY = 'avatar.mime';
+const AVATAR_SPEC_KEY = 'avatar.spec';
 
 /** True when an avatar has been saved. */
 export function hasAvatar(): boolean {
@@ -26,5 +27,18 @@ export function getAvatarMime(): string {
 export function setAvatar(imageB64: string, mime: string): boolean {
   prefs.setString(AVATAR_B64_KEY, imageB64.trim());
   prefs.setString(AVATAR_MIME_KEY, (mime || 'image/png').trim());
+  return prefs.persist();
+}
+
+/**
+ * Optional written description of the character (silhouette, face, the one accent
+ * part). Folded into every prompt to lock the design tighter than the image alone.
+ */
+export function getAvatarSpec(): string {
+  return prefs.getString(AVATAR_SPEC_KEY).trim();
+}
+
+export function setAvatarSpec(spec: string): boolean {
+  prefs.setString(AVATAR_SPEC_KEY, spec.trim());
   return prefs.persist();
 }

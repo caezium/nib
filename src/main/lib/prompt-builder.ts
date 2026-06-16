@@ -30,11 +30,19 @@ export interface BuiltPrompt {
  * (defaults to the house marker look when empty/unknown). The avatar reference
  * image is supplied separately and carries the character's identity.
  */
-export function buildPrompt(userIntent: string, styleId?: string): BuiltPrompt {
+export function buildPrompt(
+  userIntent: string,
+  styleId?: string,
+  avatarSpec?: string
+): BuiltPrompt {
   const style = resolveStyle(styleId);
   const intent = userIntent.trim();
+  const spec = (avatarSpec ?? "").trim();
+  const character = spec
+    ? `\n\nThe recurring character — keep it exactly on-model in shape, color, and proportions: ${spec}`
+    : "";
   return {
-    positive: `${BASE_METHODOLOGY}\n\nLook: ${style.look}\n\nConcept to illustrate: ${intent}`,
+    positive: `${BASE_METHODOLOGY}\n\nLook: ${style.look}${character}\n\nConcept to illustrate: ${intent}`,
     negative: NEGATIVE_PROMPT,
   };
 }

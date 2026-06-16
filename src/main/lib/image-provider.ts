@@ -1,7 +1,9 @@
 import { OpenAIProvider } from "./providers/openai";
 import { OpenRouterProvider } from "./providers/openrouter";
 import { MockImageProvider } from "./providers/mock";
+import { CodexProvider } from "./providers/codex";
 import { getResolvedApiKey, detectProviderFromKey } from "./openai-api-key";
+import { getBackendSetting, codexAvailable } from "./app-settings";
 
 // ---------------------------------------------------------------------------
 // Public interface
@@ -39,7 +41,7 @@ export interface ImageProvider {
 // Supported providers
 // ---------------------------------------------------------------------------
 
-export type ProviderName = "openai" | "openrouter" | "mock";
+export type ProviderName = "openai" | "openrouter" | "codex" | "mock";
 
 // ---------------------------------------------------------------------------
 // Provider resolution — one cached instance per provider name
@@ -57,11 +59,21 @@ const _instances: Partial<Record<ProviderName, ImageProvider>> = {};
  * at runtime takes effect immediately.
  */
 export function resolveProviderName(): ProviderName {
-  const forced = process.env.ICON_PROVIDER?.trim() as ProviderName | undefined;
-  if (forced === "mock" || forced === "openai" || forced === "openrouter") {
+  const forced = process.env.ICON_PROVIDER?.trim();
+  if (forced === "mock" || forced === "openai" || forced === "openrouter" || forced === "codex") {
     return forced;
   }
-  return detectProviderFromKey(getResolvedApiKey());
+  // A user-chosen backend (Settings) overrides auto-detection.
+  const setting = getBackendSetting();
+  if (setting === "mock" || setting === "openai" || setting === "openrouter" || setting === "codex") {
+    return setting;
+  }
+  // auto: a stored key picks its provider; with no key, fall back to the free
+  // Codex lane when available, else OpenAI (which will prompt for a key).
+  const key = getResolvedApiKey();
+  if (key) return detectProviderFromKey(key);
+  if (codexAvailable()) return "codex";
+  return "openai";
 }
 
 /**
@@ -84,6 +96,9 @@ export function getProvider(): ImageProvider {
       break;
     case "openrouter":
       created = new OpenRouterProvider();
+      break;
+    case "codex":
+      created = new CodexProvider();
       break;
     default:
       created = new OpenAIProvider();

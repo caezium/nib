@@ -1,15 +1,24 @@
 import { useEffect, useState } from "react"
-import { ShieldCheck, X } from "lucide-react"
+import { ShieldCheck, Sparkles, X } from "lucide-react"
 import { ipc } from "@/gen/ipc"
 import { cn } from "@/lib/utils"
 
+type ImageSettings = {
+  backend: string
+  model: string
+  codexAvailable: boolean
+  hasKey: boolean
+  suggestedModels: string[]
+}
+
 /**
- * Settings. Currently the home of the telemetry opt-out toggle — the only place
- * telemetry is surfaced in the app (no startup or download notice by design).
+ * Settings: the image-generation backend + model, and the telemetry opt-out.
+ * The only place either is surfaced in the app.
  */
 export function SettingsModal({ onClose }: { onClose: () => void }) {
   // `optOut === true` means telemetry is OFF. null while loading.
   const [optOut, setOptOut] = useState<boolean | null>(null)
+  const [img, setImg] = useState<ImageSettings | null>(null)
 
   useEffect(() => {
     ipc.app
@@ -19,16 +28,52 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
         setOptOut(resp.optOut ?? resp.opt_out ?? false)
       })
       .catch(() => setOptOut(false))
+
+    ipc.app
+      .GetImageSettings({})
+      .then((r) => {
+        const resp = r as unknown as {
+          backend?: string
+          model?: string
+          codexAvailable?: boolean
+          codex_available?: boolean
+          hasKey?: boolean
+          has_key?: boolean
+          suggestedModels?: string[]
+          suggested_models?: string[]
+        }
+        setImg({
+          backend: resp.backend || "auto",
+          model: resp.model || "",
+          codexAvailable: resp.codexAvailable ?? resp.codex_available ?? false,
+          hasKey: resp.hasKey ?? resp.has_key ?? false,
+          suggestedModels: resp.suggestedModels ?? resp.suggested_models ?? [],
+        })
+      })
+      .catch(() => {})
   }, [])
 
   const telemetryOn = optOut === false
-
-  const toggle = () => {
+  const toggleTelemetry = () => {
     if (optOut === null) return
     const next = !optOut
     setOptOut(next)
     ipc.app.SetTelemetryOptOut({ optOut: next }).catch(() => {})
   }
+
+  const saveImg = (next: ImageSettings) => {
+    setImg(next)
+    ipc.app.SetImageSettings({ backend: next.backend, model: next.model }).catch(() => {})
+  }
+
+  const backends = [
+    { id: "auto", label: "Auto", hint: "Key if set, else free" },
+    ...(img?.codexAvailable
+      ? [{ id: "codex", label: "Free", hint: "Your ChatGPT sub" }]
+      : []),
+    { id: "openrouter", label: "OpenRouter", hint: "Your API key" },
+  ]
+  const showModel = img != null && img.backend !== "codex"
 
   return (
     <div
@@ -39,7 +84,7 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
       onClick={onClose}
     >
       <div
-        className="relative w-[440px] max-w-[calc(100vw-32px)] rounded-xl border border-border bg-background shadow-2xl"
+        className="relative w-[460px] max-w-[calc(100vw-32px)] rounded-xl border border-border bg-background shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-4 pt-4 pb-2">
@@ -56,7 +101,71 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
           </button>
         </div>
 
-        <div className="px-4 pb-4">
+        <div className="px-4 pb-4 space-y-3">
+          {/* Image generation */}
+          <div className="rounded-xl border border-border bg-secondary/30 p-3.5">
+            <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+              <Sparkles className="w-4 h-4 text-muted-foreground" />
+              Image generation
+            </div>
+
+            <div className="mt-3 text-xs font-medium text-muted-foreground">Backend</div>
+            <div className="mt-1.5 flex gap-1.5">
+              {backends.map((b) => {
+                const active = (img?.backend || "auto") === b.id
+                return (
+                  <button
+                    key={b.id}
+                    type="button"
+                    disabled={img == null}
+                    onClick={() => img && saveImg({ ...img, backend: b.id })}
+                    className={cn(
+                      "flex-1 rounded-lg border px-2 py-1.5 text-left transition-colors",
+                      active
+                        ? "border-primary bg-primary/10"
+                        : "border-border bg-secondary/30 hover:border-foreground/30"
+                    )}
+                  >
+                    <div className="text-xs font-medium text-foreground">{b.label}</div>
+                    <div className="text-[10px] text-muted-foreground leading-tight">{b.hint}</div>
+                  </button>
+                )
+              })}
+            </div>
+
+            {img && !img.codexAvailable && (
+              <p className="text-[11px] text-muted-foreground mt-2">
+                Install the Codex CLI and run <code className="font-mono">codex login</code> to
+                generate free on your ChatGPT subscription.
+              </p>
+            )}
+
+            {showModel && (
+              <div className="mt-3">
+                <label
+                  htmlFor="or-model"
+                  className="block text-xs font-medium text-muted-foreground mb-1.5"
+                >
+                  OpenRouter model
+                </label>
+                <input
+                  id="or-model"
+                  list="or-model-suggestions"
+                  value={img.model}
+                  onChange={(e) => saveImg({ ...img, model: e.target.value })}
+                  spellCheck={false}
+                  className="w-full rounded-lg border border-border bg-secondary/20 px-3 h-8 font-mono text-xs text-foreground outline-none focus:border-foreground/40"
+                />
+                <datalist id="or-model-suggestions">
+                  {img.suggestedModels.map((m) => (
+                    <option key={m} value={m} />
+                  ))}
+                </datalist>
+              </div>
+            )}
+          </div>
+
+          {/* Telemetry */}
           <div className="rounded-xl border border-border bg-secondary/30 p-3.5">
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-start gap-2 min-w-0">
@@ -78,7 +187,7 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
                 aria-checked={telemetryOn}
                 aria-label="Share anonymous usage and crash reports"
                 disabled={optOut === null}
-                onClick={toggle}
+                onClick={toggleTelemetry}
                 className={cn(
                   "relative mt-0.5 h-6 w-10 shrink-0 rounded-full transition-colors duration-200",
                   optOut === null
