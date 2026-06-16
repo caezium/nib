@@ -102,6 +102,18 @@ Flags: `--backend auto|openrouter|codex` · `--model <id>` · `--avatar-pack <na
 A TypeScript + React desktop app (macOS) — avatar onboarding, a style picker, generation
 history, and a zoomable lightbox.
 
+**Install (macOS, Apple Silicon):**
+
+```sh
+brew install --cask caezium/tap/nib
+```
+
+This is a self-signed pre-1.0 build, so the cask clears the Gatekeeper quarantine flag on
+install. If macOS still blocks it, right-click the app and choose **Open**. Or grab the
+`.dmg` straight from [Releases](https://github.com/caezium/nib/releases).
+
+**Run from source:**
+
 ```sh
 npm install && npm run gen   # first time
 npm run dev                  # real generation (OpenAI or OpenRouter key)
