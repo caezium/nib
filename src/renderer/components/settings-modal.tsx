@@ -150,34 +150,26 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
                 </label>
                 <input
                   id="or-model"
-                  list="or-model-suggestions"
                   value={img.model}
                   onChange={(e) => saveImg({ ...img, model: e.target.value })}
                   spellCheck={false}
+                  placeholder="google/gemini-2.5-flash-image"
                   className="w-full rounded-lg border border-border bg-secondary/20 px-3 h-8 font-mono text-xs text-foreground outline-none focus:border-foreground/40"
                 />
-                <datalist id="or-model-suggestions">
-                  {img.suggestedModels.map((m) => (
-                    <option key={m} value={m} />
-                  ))}
-                </datalist>
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  Any image-output model on OpenRouter.
+                </p>
               </div>
             )}
           </div>
 
           {/* Telemetry */}
           <div className="rounded-xl border border-border bg-secondary/30 p-3.5">
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex items-start gap-2 min-w-0">
-                <ShieldCheck className="w-4 h-4 mt-0.5 shrink-0 text-muted-foreground" />
-                <div className="min-w-0">
-                  <div className="text-sm font-medium text-foreground">
-                    Share anonymous usage &amp; crash reports
-                  </div>
-                  <p className="text-xs text-muted-foreground leading-relaxed mt-1">
-                    Helps fix bugs and decide what to build next. Never includes your prompts,
-                    your avatar, your API key, or any generated image.
-                  </p>
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2 min-w-0">
+                <ShieldCheck className="w-4 h-4 shrink-0 text-muted-foreground" />
+                <div className="text-sm font-medium text-foreground">
+                  Share anonymous usage &amp; crash reports
                 </div>
               </div>
 
@@ -189,7 +181,7 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
                 disabled={optOut === null}
                 onClick={toggleTelemetry}
                 className={cn(
-                  "relative mt-0.5 h-6 w-10 shrink-0 rounded-full transition-colors duration-200",
+                  "relative h-6 w-10 shrink-0 rounded-full transition-colors duration-200",
                   optOut === null
                     ? "bg-muted cursor-wait"
                     : telemetryOn
@@ -205,6 +197,10 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
                 />
               </button>
             </div>
+            <p className="text-xs text-muted-foreground leading-relaxed mt-2 pl-6">
+              Helps fix bugs and decide what to build next. Never includes your prompts, your
+              avatar, your API key, or any generated image.
+            </p>
           </div>
         </div>
       </div>
