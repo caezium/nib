@@ -4,7 +4,7 @@ import type {
   GenerationResult,
 } from "../image-provider";
 import { withRetry } from "../image-provider";
-import { getResolvedApiKey } from "../openai-api-key";
+import { getResolvedOpenRouterApiKey } from "../openai-api-key";
 import { getOpenRouterModel } from "../app-settings";
 
 // ---------------------------------------------------------------------------
@@ -22,6 +22,15 @@ const REQUEST_TIMEOUT_MS = 90_000;
 
 /** How many times to retry a failed request before giving up. */
 const MAX_RETRIES = 3;
+
+const IMAGE_ONLY_MODELS = new Set([
+  "black-forest-labs/flux.2-pro",
+  "black-forest-labs/flux.2-flex",
+  "black-forest-labs/flux.2-klein-4b",
+  "black-forest-labs/flux.2-max",
+  "bytedance-seed/seedream-4.5",
+  "x-ai/grok-imagine-image-quality",
+]);
 
 // ---------------------------------------------------------------------------
 // Response shape (only the fields we read)
@@ -89,10 +98,10 @@ function extractImageB64(json: ChatCompletionResponse): string | null {
  */
 export class OpenRouterProvider implements ImageProvider {
   async generate(request: GenerationRequest): Promise<GenerationResult> {
-    const apiKey = getResolvedApiKey();
+    const apiKey = getResolvedOpenRouterApiKey();
     if (!apiKey) {
       throw new Error(
-        "No OpenRouter API key. Use the startup dialog or save a key in app preferences."
+        "No OpenRouter API key. Save an sk-or key in Settings, or switch to Auto/Codex."
       );
     }
 
@@ -168,7 +177,7 @@ export class OpenRouterProvider implements ImageProvider {
           },
           body: JSON.stringify({
             model,
-            modalities: ["image", "text"],
+            modalities: IMAGE_ONLY_MODELS.has(model) ? ["image"] : ["image", "text"],
             // Article illustrations are 16:9 landscape.
             image_config: { aspect_ratio: "16:9" },
             messages: [{ role: "user", content }],

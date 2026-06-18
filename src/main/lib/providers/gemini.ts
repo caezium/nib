@@ -7,21 +7,19 @@ import { spawn } from "node:child_process";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { getCodexCliPath } from "../app-settings";
+import { getGeminiCliPath } from "../app-settings";
+
+const GEMINI_TIMEOUT_MS = 480_000;
+const OUTPUT_NAME = "nib-output.png";
 
 /**
- * Free image lane: drive the logged-in Codex CLI's built-in image generation,
- * billed to the user's ChatGPT / Codex subscription — no API key.
+ * Gemini CLI lane.
  *
- * Codex runs read-only (we never grant it shell access), so an idea string can't
- * inject commands. It writes the rendered PNG into ~/.codex/generated_images/<session>/;
- * we parse the session id from its output and pick up the file. The prompt is sent
- * on stdin because `-i` is variadic and would otherwise swallow a positional prompt.
+ * Gemini CLI is a no-key lane when the user is signed in with Google. Unlike
+ * Codex, image output depends on the user's Gemini CLI media tooling/extensions,
+ * so we ask it to save a PNG in a temp workspace and then verify the file.
  */
-const GEN_ROOT = path.join(os.homedir(), ".codex", "generated_images");
-const CODEX_TIMEOUT_MS = 480_000;
-
-export class CodexProvider implements ImageProvider {
+export class GeminiProvider implements ImageProvider {
   async generate(request: GenerationRequest): Promise<GenerationResult> {
     const count = Math.max(1, request.count);
     const settled = await Promise.allSettled(
@@ -38,15 +36,15 @@ export class CodexProvider implements ImageProvider {
       const reason = rejection?.reason;
       throw reason instanceof Error
         ? reason
-        : new Error(String(reason ?? "Codex returned no image."));
+        : new Error(String(reason ?? "Gemini returned no image."));
     }
     return { images };
   }
 
   private async generateOne(request: GenerationRequest): Promise<string> {
-    const workdir = fs.mkdtempSync(path.join(os.tmpdir(), "nib-codex-"));
+    const workdir = fs.mkdtempSync(path.join(os.tmpdir(), "nib-gemini-"));
     try {
-      let avatarPath: string | undefined;
+      let avatarPath = "";
       if (request.referenceImageB64) {
         const mime = request.referenceImageMime || "image/png";
         const ext = mime.includes("jpeg")
@@ -60,22 +58,30 @@ export class CodexProvider implements ImageProvider {
         fs.writeFileSync(avatarPath, Buffer.from(request.referenceImageB64, "base64"));
       }
 
-      const instruction =
-        request.positivePrompt +
-        "\n\nGenerate exactly ONE image matching the description above, rendered as a wide 16:9 " +
-        "landscape, using your built-in image generation tool. Do NOT run any shell commands and " +
-        "do NOT save or copy files yourself — only generate the image.";
+      const outputPath = path.join(workdir, OUTPUT_NAME);
+      const instruction = [
+        request.positivePrompt,
+        "",
+        "Generate exactly ONE original illustration matching the description above.",
+        "Use any Gemini CLI image/media generation tool available in this environment.",
+        "Save the final image as a PNG file named `nib-output.png` in the current directory.",
+        "The image must be a wide 16:9 landscape illustration.",
+        avatarPath
+          ? `Use this reference character image for identity and style consistency: ${avatarPath}`
+          : "",
+        "Do not run shell commands. Do not create code. Do not include markdown in the answer.",
+        "If image generation tools are unavailable, say so plainly.",
+      ]
+        .filter(Boolean)
+        .join("\n");
 
-      const args = ["exec", "--skip-git-repo-check", "-C", workdir];
-      if (avatarPath) args.push("-i", avatarPath);
+      await runGemini(workdir, instruction);
 
-      const sessionId = await runCodex(args, instruction);
-
-      const dir = sessionId ? path.join(GEN_ROOT, sessionId) : GEN_ROOT;
-      const pngs = collectPngs(fs.existsSync(dir) ? dir : GEN_ROOT);
+      const exact = fs.existsSync(outputPath) ? outputPath : "";
+      const pngs = exact ? [exact] : collectPngs(workdir);
       if (pngs.length === 0) {
         throw new Error(
-          "Codex produced no image — your plan may not include image generation. Switch to OpenRouter in Settings."
+          "Gemini CLI ran but produced no PNG. Sign in with `gemini` and configure Gemini image/media generation tools, or use Codex/OpenRouter."
         );
       }
       const newest = pngs.sort(
@@ -88,33 +94,40 @@ export class CodexProvider implements ImageProvider {
   }
 }
 
-/** Run `codex exec …` with the prompt on stdin; resolve the session id from stdout. */
-function runCodex(args: string[], promptStdin: string): Promise<string> {
-  return new Promise<string>((resolve, reject) => {
-    const codex = getCodexCliPath();
-    if (!codex) {
+function runGemini(workdir: string, promptStdin: string): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    const gemini = getGeminiCliPath();
+    if (!gemini) {
       reject(
         new Error(
-          "Could not find the Codex CLI. Install it and run `codex login`, or switch to OpenRouter in Settings."
+          "Could not find the Gemini CLI. Install it and run `gemini` to sign in, or use Codex/OpenRouter."
         )
       );
       return;
     }
-    const child = spawn(codex, args, { stdio: ["pipe", "pipe", "pipe"] });
-    let out = "";
+
+    const child = spawn(
+      gemini,
+      ["--approval-mode", "auto_edit", "--output-format", "text", "-p", ""],
+      {
+        cwd: workdir,
+        stdio: ["pipe", "pipe", "pipe"],
+        env: { ...process.env, NO_COLOR: "1" },
+      }
+    );
     let err = "";
     const timer = setTimeout(() => {
       child.kill("SIGKILL");
-      reject(new Error("Codex timed out generating the image."));
-    }, CODEX_TIMEOUT_MS);
+      reject(new Error("Gemini timed out generating the image."));
+    }, GEMINI_TIMEOUT_MS);
 
-    child.stdout.on("data", (d) => (out += d.toString()));
+    child.stdout.on("data", () => {});
     child.stderr.on("data", (d) => (err += d.toString()));
     child.on("error", (e) => {
       clearTimeout(timer);
       reject(
         new Error(
-          `Could not run Codex (${e.message}). Install it and run \`codex login\`, or switch to OpenRouter in Settings.`
+          `Could not run Gemini (${e.message}). Install it and run \`gemini\` to sign in, or use Codex/OpenRouter.`
         )
       );
     });
@@ -123,13 +136,12 @@ function runCodex(args: string[], promptStdin: string): Promise<string> {
       if (code !== 0) {
         reject(
           new Error(
-            `Codex failed (exit ${code}). Run \`codex login\`, or switch to OpenRouter. ${err.slice(0, 300)}`
+            `Gemini failed (exit ${code}). Run \`gemini\` to sign in, configure image generation, or use Codex/OpenRouter. ${err.slice(0, 300)}`
           )
         );
         return;
       }
-      const m = out.match(/session id:\s*([0-9a-fA-F-]+)/);
-      resolve(m ? m[1] : "");
+      resolve();
     });
 
     child.stdin.write(promptStdin);

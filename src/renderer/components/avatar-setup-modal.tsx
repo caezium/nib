@@ -2,9 +2,50 @@ import { useCallback, useEffect, useState } from "react"
 import { ImagePlus, X } from "lucide-react"
 import { ipc } from "@/gen/ipc"
 import { cn } from "@/lib/utils"
+import henImg from "@/assets/characters/hen.png"
+import moImg from "@/assets/characters/mo.png"
+import sumiImg from "@/assets/characters/sumi.png"
+
+/** Bundled starter characters, so a user without an avatar isn't blocked. */
+const STARTERS: { name: string; img: string; spec: string }[] = [
+  {
+    name: "Hen",
+    img: henImg,
+    spec:
+      "A round, chunky white hen with a small red comb on top, a little orange beak, two black dot eyes, and short stubby wings. The red comb is the one accent; keep the body plump and white and the proportions chunky. Ignore any dark radial background in the reference image; it is not part of the character.",
+  },
+  {
+    name: "Mo",
+    img: moImg,
+    spec:
+      "A small mole: a rounded grey-brown body with a soft hand-drawn outline, a little pink triangular nose, two tiny dot eyes, and two small pale shovel-paws. One accent — a short red scarf. Keep the round body and the digging shovel-paws.",
+  },
+  {
+    name: "Sumi",
+    img: sumiImg,
+    spec:
+      "A small, deadpan ink-drop creature: a rounded solid-black body with a clean white outline, two round white dot eyes and a tiny flat mouth, and two short curved stick arms. One accent — a small red dot floating just above its head like a spark of an idea. Keep the silhouette simple and the red dot present in every image.",
+  },
+]
 
 /** Cap the avatar's longest edge so prefs, API payloads, and decode stay small. */
 const MAX_AVATAR_PX = 1024
+
+/** Read a bundled asset URL into raw base64 + MIME (for SetAvatar). */
+async function urlToBase64(url: string): Promise<{ b64: string; mime: string }> {
+  const res = await fetch(url)
+  const blob = await res.blob()
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      const r = reader.result as string
+      const comma = r.indexOf(",")
+      resolve({ b64: comma >= 0 ? r.slice(comma + 1) : r, mime: blob.type || "image/png" })
+    }
+    reader.onerror = reject
+    reader.readAsDataURL(blob)
+  })
+}
 
 async function downscaleAvatar(
   b64: string,
@@ -82,9 +123,23 @@ export function AvatarSetupModal({
         const scaled = await downscaleAvatar(res.imageB64, res.mime || "image/png")
         setImageB64(scaled.b64)
         setMime(scaled.mime)
+        setSpec("")
       }
     } catch {
       setError("Could not open the file picker.")
+    }
+  }, [])
+
+  const pickStarter = useCallback(async (starter: (typeof STARTERS)[number]) => {
+    setError(null)
+    try {
+      const { b64, mime: m } = await urlToBase64(starter.img)
+      const scaled = await downscaleAvatar(b64, m)
+      setImageB64(scaled.b64)
+      setMime(scaled.mime)
+      setSpec(starter.spec)
+    } catch {
+      setError("Could not load that character.")
     }
   }, [])
 
@@ -139,10 +194,38 @@ export function AvatarSetupModal({
 
         <div className="px-4 py-3 space-y-3">
           <p className="text-xs text-muted-foreground leading-relaxed">
-            Pick a clear image of your character — a mascot, a logo character, or any
-            avatar. Every illustration will star this character, drawn in the house
-            white-background style. A PNG with a simple or transparent background works best.
+            Every illustration stars one character. Start with one of ours, or upload your
+            own — a mascot, a logo character, any avatar. A clean PNG on a simple background
+            works best.
           </p>
+
+          {/* Bundled starters — no avatar of your own needed. */}
+          <div>
+            <div className="mb-1.5 text-[11px] font-medium tracking-wide text-muted-foreground">
+              Start with one of ours
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              {STARTERS.map((s) => (
+                <button
+                  key={s.name}
+                  type="button"
+                  onClick={() => void pickStarter(s)}
+                  title={`Use ${s.name}`}
+                  className="group flex flex-col items-center gap-1.5 rounded-lg border border-border bg-secondary/20 p-2 transition-[transform,border-color,background-color] hover:border-foreground/30 hover:bg-secondary/40 active:scale-[0.97]"
+                >
+                  <span className="flex h-14 w-full items-center justify-center overflow-hidden rounded-md bg-white ring-1 ring-border">
+                    <img src={s.img} alt={s.name} className="h-full w-full object-contain" draggable={false} />
+                  </span>
+                  <span className="text-[11px] font-medium text-foreground">{s.name}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 text-[11px] text-muted-foreground/60">
+            <span className="h-px flex-1 bg-border" /> or upload your own
+            <span className="h-px flex-1 bg-border" />
+          </div>
 
           <button
             type="button"

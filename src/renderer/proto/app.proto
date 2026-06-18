@@ -231,7 +231,7 @@ message ReportRendererErrorRequest {
 message GetImageSettingsRequest {}
 
 message GetImageSettingsResponse {
-  // auto | openrouter | openai | codex | mock
+  // auto | openrouter | openai | codex | gemini | mock
   string backend = 1;
   // OpenRouter image model id.
   string model = 2;
@@ -241,11 +241,16 @@ message GetImageSettingsResponse {
   bool has_key = 4;
   // Suggested OpenRouter models for the picker.
   repeated string suggested_models = 5;
+  // True when the Gemini CLI is available.
+  bool gemini_available = 6;
+  // codex | gemini — which no-key lane Auto tries first.
+  string free_backend_preference = 7;
 }
 
 message SetImageSettingsRequest {
   string backend = 1;
   string model = 2;
+  string free_backend_preference = 3;
 }
 
 service AppService {

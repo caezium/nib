@@ -63,9 +63,12 @@ import {
 import {
   getBackendSetting,
   setBackendSetting,
+  getFreeBackendPreference,
+  setFreeBackendPreference,
   getOpenRouterModel,
   setOpenRouterModel,
   codexAvailable,
+  geminiAvailable,
   SUGGESTED_MODELS,
 } from './lib/app-settings';
 import { makeShotList } from './lib/shot-list';
@@ -202,10 +205,10 @@ app.setMenu(appMenu)
 
 let hasUnsavedIllustration = false;
 
-// Create the main app window. Wider/taller than the icon app to fit 16:9 art.
+// Create the main app window. Roomy enough for the rail plus a real gallery.
 const win = new BrowserWindow({
   url: app.url,
-  size: { width: 720, height: 640 },
+  size: { width: 1120, height: 760 },
   resizable: true,
   windowTitleVisible: false,
   windowTitlebarVisible: false,
@@ -493,7 +496,7 @@ ipc.registerService(AppServiceDescriptor, {
     const name = resolveProviderName();
     return {
       // The Codex (free sub) and mock lanes need no API key.
-      openaiKeyRequired: name !== 'mock' && name !== 'codex',
+      openaiKeyRequired: name !== 'mock' && name !== 'codex' && name !== 'gemini',
       hasOpenaiKey: hasApiKeyInPrefs(),
       isMock: name === 'mock',
     };
@@ -509,9 +512,6 @@ ipc.registerService(AppServiceDescriptor, {
     request: SetOpenAIApiKeyRequest
   ): Promise<SetOpenAIApiKeyResponse> {
     const key = request.apiKey.trim();
-    if (!key) {
-      return { error: 'API key cannot be empty.' };
-    }
     prefs.setString(API_KEY_PREFS_KEY, key);
     if (!prefs.persist()) {
       return { error: 'Could not save preferences to disk.' };
@@ -546,14 +546,19 @@ ipc.registerService(AppServiceDescriptor, {
       backend: getBackendSetting(),
       model: getOpenRouterModel(),
       codexAvailable: codexAvailable(),
+      geminiAvailable: geminiAvailable(),
       hasKey: hasApiKeyInPrefs(),
       suggestedModels: SUGGESTED_MODELS,
+      freeBackendPreference: getFreeBackendPreference(),
     };
   },
 
   async SetImageSettings(request: SetImageSettingsRequest) {
     if (request.backend) setBackendSetting(request.backend);
-    if (request.model) setOpenRouterModel(request.model);
+    setOpenRouterModel(request.model);
+    if (request.freeBackendPreference) {
+      setFreeBackendPreference(request.freeBackendPreference);
+    }
     return {};
   },
 

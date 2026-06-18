@@ -1,5 +1,10 @@
 import { getResolvedApiKey } from "./openai-api-key";
 import { resolveProviderName, withRetry } from "./image-provider";
+import { getCodexCliPath, getGeminiCliPath } from "./app-settings";
+import { spawn } from "node:child_process";
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
 
 export interface Shot {
   theme: string;
@@ -10,6 +15,8 @@ export interface Shot {
 const OPENAI_CHAT_URL = "https://api.openai.com/v1/chat/completions";
 const OPENROUTER_CHAT_URL = "https://openrouter.ai/api/v1/chat/completions";
 const REQUEST_TIMEOUT_MS = 60_000;
+const CODEX_TEXT_TIMEOUT_MS = 180_000;
+const GEMINI_TEXT_TIMEOUT_MS = 180_000;
 const MAX_RETRIES = 2;
 
 const SYSTEM_PROMPT =
@@ -54,6 +61,143 @@ function chatConfig(apiKey: string): ChatConfig {
   };
 }
 
+function makeCodexPrompt(article: string): string {
+  return `${SYSTEM_PROMPT}
+
+Article:
+${article.slice(0, 24_000)}
+
+Return only the JSON object. Do not include markdown fences, explanation, or commentary.`;
+}
+
+function runCodexShotList(article: string): Promise<Shot[]> {
+  return new Promise<Shot[]>((resolve, reject) => {
+    const codex = getCodexCliPath();
+    if (!codex) {
+      reject(
+        new Error(
+          "Could not find the Codex CLI. Install it and run `codex login`, or switch to OpenRouter in Settings."
+        )
+      );
+      return;
+    }
+    const workdir = fs.mkdtempSync(path.join(os.tmpdir(), "nib-codex-shotlist-"));
+    const child = spawn(codex, ["exec", "--skip-git-repo-check", "-C", workdir], {
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+    let out = "";
+    let err = "";
+
+    const cleanup = () => {
+      fs.rmSync(workdir, { recursive: true, force: true });
+    };
+    const timer = setTimeout(() => {
+      child.kill("SIGKILL");
+      cleanup();
+      reject(new Error("Codex timed out planning the article."));
+    }, CODEX_TEXT_TIMEOUT_MS);
+
+    child.stdout.on("data", (d) => (out += d.toString()));
+    child.stderr.on("data", (d) => (err += d.toString()));
+    child.on("error", (e) => {
+      clearTimeout(timer);
+      cleanup();
+      reject(
+        new Error(
+          `Could not run Codex (${e.message}). Install it and run \`codex login\`, or switch to OpenRouter in Settings.`
+        )
+      );
+    });
+    child.on("close", (code) => {
+      clearTimeout(timer);
+      cleanup();
+      if (code !== 0) {
+        reject(
+          new Error(
+            `Codex failed planning the article (exit ${code}). Run \`codex login\`, or switch to OpenRouter. ${err.slice(0, 300)}`
+          )
+        );
+        return;
+      }
+      try {
+        const shots = parseShots(out);
+        if (shots.length === 0) throw new Error("Codex returned no usable shots.");
+        resolve(shots);
+      } catch (e) {
+        reject(e);
+      }
+    });
+
+    child.stdin.write(makeCodexPrompt(article));
+    child.stdin.end();
+  });
+}
+
+function runGeminiShotList(article: string): Promise<Shot[]> {
+  return new Promise<Shot[]>((resolve, reject) => {
+    const gemini = getGeminiCliPath();
+    if (!gemini) {
+      reject(
+        new Error(
+          "Could not find the Gemini CLI. Install it and run `gemini` to sign in, or switch to OpenRouter in Settings."
+        )
+      );
+      return;
+    }
+    const workdir = fs.mkdtempSync(path.join(os.tmpdir(), "nib-gemini-shotlist-"));
+    const child = spawn(gemini, ["--output-format", "text", "-p", ""], {
+      cwd: workdir,
+      stdio: ["pipe", "pipe", "pipe"],
+      env: { ...process.env, NO_COLOR: "1" },
+    });
+    let out = "";
+    let err = "";
+
+    const cleanup = () => {
+      fs.rmSync(workdir, { recursive: true, force: true });
+    };
+    const timer = setTimeout(() => {
+      child.kill("SIGKILL");
+      cleanup();
+      reject(new Error("Gemini timed out planning the article."));
+    }, GEMINI_TEXT_TIMEOUT_MS);
+
+    child.stdout.on("data", (d) => (out += d.toString()));
+    child.stderr.on("data", (d) => (err += d.toString()));
+    child.on("error", (e) => {
+      clearTimeout(timer);
+      cleanup();
+      reject(
+        new Error(
+          `Could not run Gemini (${e.message}). Install it and run \`gemini\` to sign in, or switch to OpenRouter in Settings.`
+        )
+      );
+    });
+    child.on("close", (code) => {
+      clearTimeout(timer);
+      cleanup();
+      if (code !== 0) {
+        reject(
+          new Error(
+            `Gemini failed planning the article (exit ${code}). Run \`gemini\` to sign in, or switch to OpenRouter. ${err.slice(0, 300)}`
+          )
+        );
+        return;
+      }
+      try {
+        const shots = parseShots(out);
+        if (shots.length === 0) throw new Error("Gemini returned no usable shots.");
+        resolve(shots);
+      } catch (e) {
+        reject(e);
+      }
+    });
+
+    child.stdin.write(makeCodexPrompt(article));
+    child.stdin.end();
+  });
+}
+
 /** Lenient JSON parse: tolerate ```json fences and surrounding prose. */
 function parseShots(content: string): Shot[] {
   let text = content.trim();
@@ -89,13 +233,20 @@ export async function makeShotList(article: string): Promise<Shot[]> {
   const text = article.trim();
   if (!text) return [];
 
-  if (resolveProviderName() === "mock") {
+  const provider = resolveProviderName();
+  if (provider === "mock") {
     return [
       { theme: "Two breakpoints", coreIdea: "A decision splits into two clearly different paths.", labels: ["A", "B"] },
       { theme: "Sort by purpose", coreIdea: "Items are sorted into labeled bins by their goal.", labels: ["sort"] },
       { theme: "Trust bridge", coreIdea: "Evidence tiles are laid one by one to build a bridge to trust.", labels: ["trust"] },
       { theme: "Idea well", coreIdea: "Ideas are pulled up from a deep well like buckets of water.", labels: [] },
     ];
+  }
+  if (provider === "codex") {
+    return runCodexShotList(text);
+  }
+  if (provider === "gemini") {
+    return runGeminiShotList(text);
   }
 
   const apiKey = getResolvedApiKey();

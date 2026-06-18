@@ -2,8 +2,14 @@ import { OpenAIProvider } from "./providers/openai";
 import { OpenRouterProvider } from "./providers/openrouter";
 import { MockImageProvider } from "./providers/mock";
 import { CodexProvider } from "./providers/codex";
+import { GeminiProvider } from "./providers/gemini";
 import { getResolvedApiKey, detectProviderFromKey } from "./openai-api-key";
-import { getBackendSetting, codexAvailable } from "./app-settings";
+import {
+  getBackendSetting,
+  getFreeBackendPreference,
+  codexAvailable,
+  geminiAvailable,
+} from "./app-settings";
 
 // ---------------------------------------------------------------------------
 // Public interface
@@ -41,13 +47,23 @@ export interface ImageProvider {
 // Supported providers
 // ---------------------------------------------------------------------------
 
-export type ProviderName = "openai" | "openrouter" | "codex" | "mock";
+export type ProviderName = "openai" | "openrouter" | "codex" | "gemini" | "mock";
 
 // ---------------------------------------------------------------------------
 // Provider resolution — one cached instance per provider name
 // ---------------------------------------------------------------------------
 
 const _instances: Partial<Record<ProviderName, ImageProvider>> = {};
+
+function firstFreeProvider(): ProviderName | null {
+  const order: Array<"codex" | "gemini"> =
+    getFreeBackendPreference() === "gemini" ? ["gemini", "codex"] : ["codex", "gemini"];
+  for (const provider of order) {
+    if (provider === "codex" && codexAvailable()) return "codex";
+    if (provider === "gemini" && geminiAvailable()) return "gemini";
+  }
+  return null;
+}
 
 /**
  * Resolve the active provider name.
@@ -60,19 +76,32 @@ const _instances: Partial<Record<ProviderName, ImageProvider>> = {};
  */
 export function resolveProviderName(): ProviderName {
   const forced = process.env.ICON_PROVIDER?.trim();
-  if (forced === "mock" || forced === "openai" || forced === "openrouter" || forced === "codex") {
+  if (
+    forced === "mock" ||
+    forced === "openai" ||
+    forced === "openrouter" ||
+    forced === "codex" ||
+    forced === "gemini"
+  ) {
     return forced;
   }
-  // A user-chosen backend (Settings) overrides auto-detection.
+  // A user-chosen backend (Settings) usually overrides auto-detection. If the
+  // chosen API-key lane has no key, fall back to Codex when it is available so
+  // stale settings do not trap the app in a dead "No API key" state.
   const setting = getBackendSetting();
-  if (setting === "mock" || setting === "openai" || setting === "openrouter" || setting === "codex") {
+  if (setting === "mock" || setting === "codex" || setting === "gemini") {
     return setting;
   }
-  // auto: a stored key picks its provider; with no key, fall back to the free
-  // Codex lane when available, else OpenAI (which will prompt for a key).
+  if (setting === "openai" || setting === "openrouter") {
+    const free = firstFreeProvider();
+    return getResolvedApiKey() || !free ? setting : free;
+  }
+  // auto: prefer no-key subscription/CLI lanes first, then fall back to the
+  // saved API key, else OpenAI (which will prompt for a key).
+  const free = firstFreeProvider();
+  if (free) return free;
   const key = getResolvedApiKey();
   if (key) return detectProviderFromKey(key);
-  if (codexAvailable()) return "codex";
   return "openai";
 }
 
@@ -99,6 +128,9 @@ export function getProvider(): ImageProvider {
       break;
     case "codex":
       created = new CodexProvider();
+      break;
+    case "gemini":
+      created = new GeminiProvider();
       break;
     default:
       created = new OpenAIProvider();

@@ -14,7 +14,7 @@ type ThemeProviderState = {
 }
 
 const initialState: ThemeProviderState = {
-    theme: "system",
+    theme: "light",
     setTheme: () => null,
 }
 
@@ -24,10 +24,13 @@ export function useTheme() {
     return React.useContext(ThemeProviderContext)
 }
 
+// Nib's editorial look is light-only. The storage key is intentionally NOT the
+// old "vite-ui-theme" — that key may still hold a stale "dark"/"system" value
+// from the MoIcons-era build, which would override the light palette.
 export function ThemeProvider({
                                   children,
-                                  defaultTheme = "system",
-                                  storageKey = "vite-ui-theme",
+                                  defaultTheme = "light",
+                                  storageKey = "nib-ui-theme",
                                   ...props
                               }: ThemeProviderProps) {
     const [theme, setThemeState] = useState<Theme>(

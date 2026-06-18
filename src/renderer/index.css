@@ -152,6 +152,15 @@
         -webkit-app-region: no-drag;
     }
 
+    .scrollbar-none {
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+    }
+
+    .scrollbar-none::-webkit-scrollbar {
+        display: none;
+    }
+
     @keyframes thinking-dot {
         0%, 80%, 100% { transform: scale(0.6); opacity: 0.3; }
         40% { transform: scale(1); opacity: 1; }
@@ -177,6 +186,20 @@
 
     .blueprint-scan {
         animation: blueprint-scan 2.2s ease-in-out infinite;
+    }
+
+    /* Plate entrance — a subtle fade + rise, runs once when a tile mounts. */
+    @keyframes plate-in {
+        from { opacity: 0; transform: translateY(7px) scale(0.985); }
+        to   { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    .plate-in {
+        animation: plate-in 0.34s cubic-bezier(0.2, 0, 0, 1) both;
+    }
+
+    .tnum {
+        font-variant-numeric: tabular-nums;
     }
 }
 

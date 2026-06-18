@@ -1,14 +1,17 @@
 /**
- * Starter concepts shown in the empty preview area. Short, illustratable
- * editorial ideas (one judgment / metaphor each) — original wording.
+ * Starter concepts shown in the empty gallery. Short, illustratable editorial
+ * ideas (one judgment / metaphor each) in the AI/dev/systems register Nib is
+ * built for — the kind of concept a recurring character can physically perform.
+ * Original wording.
  */
 export const EXAMPLE_PROMPTS: string[] = [
-  "trust is built one piece of evidence at a time",
-  "small habits compound into a big result",
-  "sort incoming work by purpose, not by arrival",
-  "saying no protects the few things that matter",
-  "ship, learn, adjust — the feedback loop",
-  "the last 20% takes 80% of the effort",
+  "one fish, many dishes",
+  "the information well",
+  "the idea press",
+  "content left to ferment",
+  "building the trust bridge, plank by plank",
+  "RAG: fetch the right page first, then write the answer",
+  "ship it before you're ready, fix it in the open",
 ]
 
 /** Example article URLs to demo the fetch flow — all extract cleanly. */
@@ -21,14 +24,14 @@ export const EXAMPLE_ARTICLE_URLS: { label: string; url: string }[] = [
 /** Short sample posts for Article mode — each has several illustratable ideas. */
 export const EXAMPLE_ARTICLES: { title: string; body: string }[] = [
   {
-    title: "Why to-do lists fail",
+    title: "What a RAG pipeline really does",
     body:
-      "Most to-do lists fail because they treat every task as equal. In reality, a handful of items carry almost all the value and the rest is noise that just makes you feel busy. The first move is to sort by purpose, not by the order things arrived. Then protect your focus: saying no to good-enough work is what makes room for the few things that matter. Watch the long tail, too — the last twenty percent of a task often eats eighty percent of the effort, so decide in advance how \"done\" is good enough. Finally, treat the list as a loop, not a monument: review it, cut what's stale, and start again tomorrow.",
+      "A retrieval-augmented model doesn't actually \"know\" your docs — it looks them up first. The pipeline chops your sources into chunks, finds the few most relevant to the question, and hands only those to the model as context. The model then writes its answer from what it was handed, not from memory. That's the whole trick, and also the whole risk: when retrieval grabs the wrong chunk, the model confidently writes from the wrong page. Get the fetch right and the rest follows; get it wrong and no amount of clever prompting saves you.",
   },
   {
-    title: "Earning user trust",
+    title: "Why your agent gets stuck",
     body:
-      "Trust isn't announced; it's accumulated. Users believe what they can verify, so every clear receipt, honest error message, and kept promise lays down another plank. Move in small, reversible steps — a big confident claim with nothing behind it reads as a red flag, while a quiet feature that just works builds quiet confidence. Be visible when things break: owning a failure openly often earns more trust than a flawless month. And keep your story consistent across every surface, because one contradiction can undo a dozen good interactions.",
+      "Agents rarely fail because the model is dumb; they fail because the loop is. Give one too many tools and it dithers over which to reach for. Let the context window fill and the earliest instructions quietly fall off the edge, so it forgets the goal it started with. Without a clear stop condition it loops, re-checking work it already finished. The fix is rarely a bigger model — it's a smaller surface: fewer tools, a goal it can't lose, and a hard limit on how many turns it gets before it has to show its work.",
   },
   {
     title: "How small teams ship fast",
