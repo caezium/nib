@@ -46,7 +46,7 @@ import {
 import { AppServiceDescriptor } from './gen/ipc_service';
 import { buildPrompt } from './lib/prompt-builder';
 import { styleList } from './lib/styles';
-import { getProvider, resolveProviderName } from './lib/image-provider';
+import { resolveProvider } from './lib/provider-resolver';
 import {
   getResolvedApiKey,
   hasApiKeyInPrefs,
@@ -75,7 +75,6 @@ import {
   SUGGESTED_MODELS,
   SUGGESTED_TEXT_MODELS,
 } from './lib/app-settings';
-import { makeShotList } from './lib/shot-list';
 import { fetchArticle } from './lib/fetch-article';
 import {
   saveGeneration,
@@ -113,7 +112,7 @@ async function showAboutDialog() {
 app.setTheme('light');
 
 // Anonymous, opt-out telemetry (usage events + crash reports).
-initTelemetry(resolveProviderName());
+initTelemetry(resolveProvider().name);
 
 // ---------------------------------------------------------------------------
 // Main App Menu
@@ -378,7 +377,10 @@ ipc.registerService(AppServiceDescriptor, {
 
   async GenerateIcon(request: GenerateIconRequest): Promise<GenerateIconResponse> {
     const startedAt = Date.now();
-    const provider = resolveProviderName();
+    // Resolve once: the same backend serves the image generation below and any
+    // text-lane work, so the two lanes can't disagree.
+    const backend = resolveProvider();
+    const provider = backend.name;
     try {
       const { positive, negative } = buildPrompt(request.prompt, request.style, getAvatarSpec());
       // The avatar is the persistent reference character; a per-generation
@@ -393,7 +395,7 @@ ipc.registerService(AppServiceDescriptor, {
         ? request.referenceMime.trim() || 'image/png'
         : getAvatarMime();
       const count = request.variantCount > 0 ? request.variantCount : 3;
-      const result = await getProvider().generate({
+      const result = await backend.generate({
         positivePrompt: positive,
         negativePrompt: negative,
         referenceImageB64: reference,
@@ -474,7 +476,7 @@ ipc.registerService(AppServiceDescriptor, {
 
   async MakeShotList(request: MakeShotListRequest): Promise<MakeShotListResponse> {
     try {
-      const shots = await makeShotList(request.article);
+      const shots = await resolveProvider().planShots(request.article);
       capture('shotlist', { status: 'ok', shots: shots.length });
       return {
         shots: shots.map((s) => ({
@@ -497,7 +499,7 @@ ipc.registerService(AppServiceDescriptor, {
   ): Promise<GetOpenAIApiKeyStatusResponse> {
     // A key is required for any real image provider (OpenAI or OpenRouter);
     // only the mock provider needs none.
-    const name = resolveProviderName();
+    const name = resolveProvider().name;
     return {
       // The Codex (free sub) and mock lanes need no API key.
       openaiKeyRequired: name !== 'mock' && name !== 'codex' && name !== 'gemini',
