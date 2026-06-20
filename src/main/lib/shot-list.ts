@@ -1,5 +1,5 @@
 import { getResolvedApiKey } from "./openai-api-key";
-import { resolveProviderName, withRetry } from "./image-provider";
+import { withRetry, type ProviderName } from "./image-provider";
 import { getCodexCliPath, getGeminiCliPath, getTextModel } from "./app-settings";
 import { spawn } from "node:child_process";
 import * as fs from "node:fs";
@@ -37,9 +37,8 @@ interface ChatConfig {
   headers: Record<string, string>;
 }
 
-function chatConfig(apiKey: string): ChatConfig {
-  const name = resolveProviderName();
-  if (name === "openrouter") {
+function chatConfig(provider: ProviderName, apiKey: string): ChatConfig {
+  if (provider === "openrouter") {
     return {
       url: OPENROUTER_CHAT_URL,
       model: getTextModel(),
@@ -229,14 +228,17 @@ function parseShots(content: string): Shot[] {
 }
 
 /**
- * Turn an article into a shot list (4-8 illustratable ideas) via a text LLM.
- * Uses the same key/provider as image generation.
+ * Turn an article into a shot list (4-8 illustratable ideas) via a text LLM,
+ * on the already-resolved provider. The caller (provider-resolver) decides the
+ * lane so the text and image lanes can't disagree; this function just runs it.
  */
-export async function makeShotList(article: string): Promise<Shot[]> {
+export async function planShotList(
+  provider: ProviderName,
+  article: string
+): Promise<Shot[]> {
   const text = article.trim();
   if (!text) return [];
 
-  const provider = resolveProviderName();
   if (provider === "mock") {
     return [
       { theme: "Two breakpoints", coreIdea: "A decision splits into two clearly different paths.", labels: ["A", "B"] },
@@ -256,7 +258,7 @@ export async function makeShotList(article: string): Promise<Shot[]> {
   if (!apiKey) {
     throw new Error("No API key. Add an OpenAI or OpenRouter key in app preferences.");
   }
-  const cfg = chatConfig(apiKey);
+  const cfg = chatConfig(provider, apiKey);
 
   return withRetry(async () => {
     const controller = new AbortController();
