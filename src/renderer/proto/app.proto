@@ -61,6 +61,10 @@ message GenerateIconResponse {
   // Base64-encoded PNG images, no data URL prefix.
   repeated string images = 1;
   string error = 2;
+  // Machine-readable failure class so the UI branches on a code, not the
+  // message string: no_key | no_credits | cli_missing | timeout |
+  // unsupported_model | declined | unknown. Empty on success.
+  string error_reason = 3;
 }
 
 message GetOpenAIApiKeyStatusRequest {}
@@ -245,12 +249,20 @@ message GetImageSettingsResponse {
   bool gemini_available = 6;
   // codex | gemini — which no-key lane Auto tries first.
   string free_backend_preference = 7;
+  // Why the Codex lane is/isn't usable: ok | no-cli | logged-out | needs-update.
+  string codex_status = 8;
+  // Text model that drafts an article's shot list (OpenRouter lane).
+  string text_model = 9;
+  // Suggested text models for the shot-list picker.
+  repeated string suggested_text_models = 10;
 }
 
 message SetImageSettingsRequest {
   string backend = 1;
   string model = 2;
   string free_backend_preference = 3;
+  // Text model for article shot-list drafting.
+  string text_model = 4;
 }
 
 service AppService {

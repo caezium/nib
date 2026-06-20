@@ -3,6 +3,7 @@ import type {
   GenerationRequest,
   GenerationResult,
 } from "../image-provider";
+import { GenerationError } from "../image-provider";
 import { spawn } from "node:child_process";
 import * as fs from "node:fs";
 import * as os from "node:os";
@@ -67,9 +68,9 @@ export class GeminiProvider implements ImageProvider {
         "Save the final image as a PNG file named `nib-output.png` in the current directory.",
         "The image must be a wide 16:9 landscape illustration.",
         avatarPath
-          ? `Use this reference character image for identity and style consistency: ${avatarPath}`
+          ? `Reference character — match its identity, colours, and proportions exactly: @${avatarPath}`
           : "",
-        "Do not run shell commands. Do not create code. Do not include markdown in the answer.",
+        "Do not create code. Do not include markdown in the answer.",
         "If image generation tools are unavailable, say so plainly.",
       ]
         .filter(Boolean)
@@ -78,9 +79,12 @@ export class GeminiProvider implements ImageProvider {
       await runGemini(workdir, instruction);
 
       const exact = fs.existsSync(outputPath) ? outputPath : "";
-      const pngs = exact ? [exact] : collectPngs(workdir);
+      // Exclude the avatar we wrote into this workdir — otherwise a run that
+      // produced no output would "succeed" by handing the reference straight back.
+      const pngs = exact ? [exact] : collectPngs(workdir, avatarPath);
       if (pngs.length === 0) {
-        throw new Error(
+        throw new GenerationError(
+          "declined",
           "Gemini CLI ran but produced no PNG. Sign in with `gemini` and configure Gemini image/media generation tools, or use Codex/OpenRouter."
         );
       }
@@ -94,24 +98,28 @@ export class GeminiProvider implements ImageProvider {
   }
 }
 
-function runGemini(workdir: string, promptStdin: string): Promise<void> {
+function runGemini(workdir: string, prompt: string): Promise<void> {
   return new Promise<void>((resolve, reject) => {
     const gemini = getGeminiCliPath();
     if (!gemini) {
       reject(
-        new Error(
+        new GenerationError(
+          "cli_missing",
           "Could not find the Gemini CLI. Install it and run `gemini` to sign in, or use Codex/OpenRouter."
         )
       );
       return;
     }
 
+    // Non-interactive: pass the whole prompt as the -p argument. (An empty -p
+    // plus a stdin prompt was unreliable.) `@<path>` references in the prompt
+    // tell the Gemini CLI to load that file — that's how the avatar reaches it.
     const child = spawn(
       gemini,
-      ["--approval-mode", "auto_edit", "--output-format", "text", "-p", ""],
+      ["--approval-mode", "auto_edit", "--output-format", "text", "-p", prompt],
       {
         cwd: workdir,
-        stdio: ["pipe", "pipe", "pipe"],
+        stdio: ["ignore", "pipe", "pipe"],
         env: { ...process.env, NO_COLOR: "1" },
       }
     );
@@ -143,13 +151,10 @@ function runGemini(workdir: string, promptStdin: string): Promise<void> {
       }
       resolve();
     });
-
-    child.stdin.write(promptStdin);
-    child.stdin.end();
   });
 }
 
-function collectPngs(dir: string): string[] {
+function collectPngs(dir: string, exclude?: string): string[] {
   const found: string[] = [];
   const walk = (d: string) => {
     let entries: fs.Dirent[];
@@ -161,7 +166,7 @@ function collectPngs(dir: string): string[] {
     for (const e of entries) {
       const p = path.join(d, e.name);
       if (e.isDirectory()) walk(p);
-      else if (e.name.toLowerCase().endsWith(".png")) found.push(p);
+      else if (e.name.toLowerCase().endsWith(".png") && p !== exclude) found.push(p);
     }
   };
   walk(dir);

@@ -42,21 +42,39 @@ export type ProviderName = "openai" | "openrouter" | "codex" | "gemini" | "mock"
 // ---------------------------------------------------------------------------
 
 /**
- * A failure that retrying cannot fix (bad API key, out of credits, …). Throw
- * this instead of a plain Error so `withRetry` surfaces it immediately rather
- * than burning the full backoff budget on a request that can never succeed.
+ * Machine-readable classification of a generation failure. The renderer can
+ * branch on this code instead of pattern-matching free-text error messages
+ * (see error-modal.tsx). `message` stays human-facing; `reason` drives behavior.
  */
-export class TerminalError extends Error {
-  constructor(message: string) {
+export type GenerationErrorReason =
+  | "no_key" // missing/empty/rejected credential — knowable pre-flight
+  | "no_credits" // 402 / quota exhausted
+  | "cli_missing" // codex/gemini binary absent, logged out, or too old
+  | "timeout" // request exceeded the provider's budget
+  | "unsupported_model" // selected model can't emit images
+  | "declined" // model refused / returned no image
+  | "unknown";
+
+/**
+ * The structured error every provider should throw. `retryable: false`
+ * short-circuits `withRetry` so a request that can never succeed (bad key, out
+ * of credits) fails fast instead of burning the full backoff budget.
+ */
+export class GenerationError extends Error {
+  constructor(
+    readonly reason: GenerationErrorReason,
+    message: string,
+    readonly retryable = false
+  ) {
     super(message);
-    this.name = "TerminalError";
+    this.name = "GenerationError";
   }
 }
 
 /**
  * Run `fn` up to `maxAttempts` times.  On failure before the last attempt,
  * waits `initialDelayMs × attempt` milliseconds before retrying (linear back-off).
- * A `TerminalError` short-circuits the loop and is rethrown at once.
+ * A non-retryable `GenerationError` short-circuits the loop and is rethrown.
  */
 export async function withRetry<T>(
   fn: () => Promise<T>,
@@ -69,7 +87,7 @@ export async function withRetry<T>(
       return await fn();
     } catch (err) {
       lastError = err;
-      if (err instanceof TerminalError) throw err;
+      if (err instanceof GenerationError && !err.retryable) throw err;
       if (attempt < maxAttempts) {
         await new Promise<void>((r) => setTimeout(r, initialDelayMs * attempt));
       }

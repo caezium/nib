@@ -3,6 +3,7 @@ import type {
   GenerationRequest,
   GenerationResult,
 } from "../image-provider";
+import { GenerationError } from "../image-provider";
 import { spawn } from "node:child_process";
 import * as fs from "node:fs";
 import * as os from "node:os";
@@ -82,14 +83,16 @@ export class CodexProvider implements ImageProvider {
       // concurrent run's PNG — the "every shot is byte-identical" bug. Requiring
       // the session id makes each pickup concurrency-safe.)
       if (!sessionId) {
-        throw new Error(
+        throw new GenerationError(
+          "declined",
           "Codex finished but didn't report a session id, so its image can't be located. Update the Codex CLI, or switch to OpenRouter in Settings."
         );
       }
       const sessionDir = path.join(GEN_ROOT, sessionId);
       const pngs = fs.existsSync(sessionDir) ? collectPngs(sessionDir) : [];
       if (pngs.length === 0) {
-        throw new Error(
+        throw new GenerationError(
+          "declined",
           "Codex produced no new image — your plan may not include image generation, or it declined the request. Switch to OpenRouter in Settings."
         );
       }
@@ -109,7 +112,8 @@ function runCodex(args: string[], promptStdin: string): Promise<string> {
     const codex = getCodexCliPath();
     if (!codex) {
       reject(
-        new Error(
+        new GenerationError(
+          "cli_missing",
           "Could not find the Codex CLI. Install it and run `codex login`, or switch to OpenRouter in Settings."
         )
       );
