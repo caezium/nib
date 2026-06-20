@@ -67,9 +67,13 @@ import {
   setFreeBackendPreference,
   getOpenRouterModel,
   setOpenRouterModel,
+  getTextModel,
+  setTextModel,
   codexAvailable,
+  getCodexStatus,
   geminiAvailable,
   SUGGESTED_MODELS,
+  SUGGESTED_TEXT_MODELS,
 } from './lib/app-settings';
 import { makeShotList } from './lib/shot-list';
 import { fetchArticle } from './lib/fetch-article';
@@ -545,10 +549,13 @@ ipc.registerService(AppServiceDescriptor, {
     return {
       backend: getBackendSetting(),
       model: getOpenRouterModel(),
+      textModel: getTextModel(),
       codexAvailable: codexAvailable(),
+      codexStatus: getCodexStatus(),
       geminiAvailable: geminiAvailable(),
       hasKey: hasApiKeyInPrefs(),
       suggestedModels: SUGGESTED_MODELS,
+      suggestedTextModels: SUGGESTED_TEXT_MODELS,
       freeBackendPreference: getFreeBackendPreference(),
     };
   },
@@ -556,6 +563,10 @@ ipc.registerService(AppServiceDescriptor, {
   async SetImageSettings(request: SetImageSettingsRequest) {
     if (request.backend) setBackendSetting(request.backend);
     setOpenRouterModel(request.model);
+    // Persist unconditionally (like the image model above): an empty string
+    // clears the override so getTextModel() falls back to the default, and the
+    // saved value never diverges from what the Settings UI shows.
+    setTextModel(request.textModel ?? "");
     if (request.freeBackendPreference) {
       setFreeBackendPreference(request.freeBackendPreference);
     }

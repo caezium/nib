@@ -1,6 +1,6 @@
 import { getResolvedApiKey } from "./openai-api-key";
 import { resolveProviderName, withRetry } from "./image-provider";
-import { getCodexCliPath, getGeminiCliPath } from "./app-settings";
+import { getCodexCliPath, getGeminiCliPath, getTextModel } from "./app-settings";
 import { spawn } from "node:child_process";
 import * as fs from "node:fs";
 import * as os from "node:os";
@@ -42,7 +42,7 @@ function chatConfig(apiKey: string): ChatConfig {
   if (name === "openrouter") {
     return {
       url: OPENROUTER_CHAT_URL,
-      model: process.env.OPENROUTER_TEXT_MODEL?.trim() || "openai/gpt-4o-mini",
+      model: getTextModel(),
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${apiKey}`,
@@ -145,11 +145,17 @@ function runGeminiShotList(article: string): Promise<Shot[]> {
       return;
     }
     const workdir = fs.mkdtempSync(path.join(os.tmpdir(), "nib-gemini-shotlist-"));
-    const child = spawn(gemini, ["--output-format", "text", "-p", ""], {
-      cwd: workdir,
-      stdio: ["pipe", "pipe", "pipe"],
-      env: { ...process.env, NO_COLOR: "1" },
-    });
+    // Pass the whole prompt via -p (an empty -p plus a stdin prompt was
+    // unreliable — the prompt never reached the model). Matches runGemini().
+    const child = spawn(
+      gemini,
+      ["--output-format", "text", "-p", makeCodexPrompt(article)],
+      {
+        cwd: workdir,
+        stdio: ["ignore", "pipe", "pipe"],
+        env: { ...process.env, NO_COLOR: "1" },
+      }
+    );
     let out = "";
     let err = "";
 
@@ -192,9 +198,6 @@ function runGeminiShotList(article: string): Promise<Shot[]> {
         reject(e);
       }
     });
-
-    child.stdin.write(makeCodexPrompt(article));
-    child.stdin.end();
   });
 }
 

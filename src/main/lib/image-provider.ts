@@ -89,7 +89,17 @@ export function resolveProviderName(): ProviderName {
   // chosen API-key lane has no key, fall back to Codex when it is available so
   // stale settings do not trap the app in a dead "No API key" state.
   const setting = getBackendSetting();
-  if (setting === "mock" || setting === "codex" || setting === "gemini") {
+  if (setting === "mock") return "mock";
+  if (setting === "codex" || setting === "gemini") {
+    const usable = setting === "codex" ? codexAvailable() : geminiAvailable();
+    if (usable) return setting;
+    // The saved free lane isn't usable (not installed / logged out / no image
+    // feature). Fall back so a stale setting doesn't fail every generation:
+    // the other free lane, else a saved API key, else the choice as-is.
+    const free = firstFreeProvider();
+    if (free) return free;
+    const key = getResolvedApiKey();
+    if (key) return detectProviderFromKey(key);
     return setting;
   }
   if (setting === "openai" || setting === "openrouter") {
@@ -144,8 +154,21 @@ export function getProvider(): ImageProvider {
 // ---------------------------------------------------------------------------
 
 /**
+ * A failure that retrying cannot fix (bad API key, out of credits, …). Throw
+ * this instead of a plain Error so `withRetry` surfaces it immediately rather
+ * than burning the full backoff budget on a request that can never succeed.
+ */
+export class TerminalError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "TerminalError";
+  }
+}
+
+/**
  * Run `fn` up to `maxAttempts` times.  On failure before the last attempt,
  * waits `initialDelayMs × attempt` milliseconds before retrying (linear back-off).
+ * A `TerminalError` short-circuits the loop and is rethrown at once.
  */
 export async function withRetry<T>(
   fn: () => Promise<T>,
@@ -158,6 +181,7 @@ export async function withRetry<T>(
       return await fn();
     } catch (err) {
       lastError = err;
+      if (err instanceof TerminalError) throw err;
       if (attempt < maxAttempts) {
         await new Promise<void>((r) => setTimeout(r, initialDelayMs * attempt));
       }
