@@ -1,5 +1,16 @@
 import { useEffect, useState } from "react"
-import { ShieldCheck, Sparkles, X } from "lucide-react"
+import {
+  Check,
+  ChevronDown,
+  ExternalLink,
+  Eye,
+  EyeOff,
+  KeyRound,
+  Route,
+  ShieldCheck,
+  Sparkles,
+  X,
+} from "lucide-react"
 import { ipc } from "@/gen/ipc"
 import { cn } from "@/lib/utils"
 
@@ -7,18 +18,137 @@ type ImageSettings = {
   backend: string
   model: string
   codexAvailable: boolean
+  geminiAvailable: boolean
+  freeBackendPreference: FreeBackendPreference
   hasKey: boolean
   suggestedModels: string[]
 }
 
+type ApiKeyKind = "openrouter" | "openai" | "empty"
+type FreeBackendPreference = "codex" | "gemini"
+
+type ModelDetails = {
+  name: string
+  note: string
+}
+
+const OPENAI_API_KEYS_HELP_URL = "https://platform.openai.com/api-keys"
+const OPENROUTER_API_KEYS_HELP_URL = "https://openrouter.ai/keys"
+
+const MODEL_DETAILS: Record<string, ModelDetails> = {
+  "google/gemini-3.1-flash-image-preview": {
+    name: "Nano Banana 2",
+    note: "Gemini 3.1 Flash Image Preview",
+  },
+  "google/gemini-3-pro-image-preview": {
+    name: "Nano Banana Pro",
+    note: "Gemini 3 Pro Image Preview",
+  },
+  "google/gemini-2.5-flash-image": {
+    name: "Nano Banana",
+    note: "Gemini 2.5 Flash Image",
+  },
+  "openai/gpt-5.4-image-2": {
+    name: "GPT-5.4 Image 2",
+    note: "OpenAI on OpenRouter",
+  },
+  "openai/gpt-5-image-mini": {
+    name: "GPT-5 Image Mini",
+    note: "OpenAI on OpenRouter",
+  },
+  "openai/gpt-5-image": {
+    name: "GPT-5 Image",
+    note: "OpenAI on OpenRouter",
+  },
+  "black-forest-labs/flux.2-pro": {
+    name: "FLUX.2 Pro",
+    note: "BFL image generation",
+  },
+  "black-forest-labs/flux.2-flex": {
+    name: "FLUX.2 Flex",
+    note: "BFL image generation",
+  },
+  "bytedance-seed/seedream-4.5": {
+    name: "Seedream 4.5",
+    note: "ByteDance Seed",
+  },
+  "x-ai/grok-imagine-image-quality": {
+    name: "Grok Imagine",
+    note: "xAI image quality",
+  },
+}
+
+function keyKind(value: string): ApiKeyKind {
+  const trimmed = value.trim()
+  if (!trimmed) return "empty"
+  return trimmed.startsWith("sk-or-") ? "openrouter" : "openai"
+}
+
+function keyKindLabel(kind: ApiKeyKind): string {
+  if (kind === "openrouter") return "OpenRouter key"
+  if (kind === "openai") return "OpenAI key"
+  return "No key saved"
+}
+
+function modelDetails(id: string): ModelDetails {
+  return MODEL_DETAILS[id] ?? { name: id || "Default model", note: "Custom OpenRouter model id" }
+}
+
+function openExternal(url: string) {
+  ipc.app.OpenExternalUrl({ url }).catch(() => {})
+}
+
+function normalizeFreeBackendPreference(value: string | undefined): FreeBackendPreference {
+  return value === "gemini" ? "gemini" : "codex"
+}
+
+function routeSummary(img: ImageSettings | null, apiKeyDraft: string): string {
+  if (!img) return "Loading route..."
+  const kind = keyKind(apiKeyDraft)
+  const preferred = img.freeBackendPreference
+  const primary = preferred === "gemini" ? "Gemini CLI" : "Codex"
+  const secondary = preferred === "gemini" ? "Codex" : "Gemini CLI"
+  const primaryAvailable = preferred === "gemini" ? img.geminiAvailable : img.codexAvailable
+  const secondaryAvailable = preferred === "gemini" ? img.codexAvailable : img.geminiAvailable
+  if (img.backend === "codex") return "Codex uses your signed-in Codex app subscription."
+  if (img.backend === "gemini") return "Gemini uses your signed-in Gemini CLI."
+  if (img.backend === "openai") return "OpenAI API uses gpt-image-1, high quality, 1536x1024."
+  if (img.backend === "openrouter") return `OpenRouter uses ${img.model || "the default model"}.`
+  if (primaryAvailable && secondaryAvailable) {
+    return `Auto will try ${primary}, then ${secondary}, then API keys.`
+  }
+  if (primaryAvailable) return `Auto will use ${primary}; ${secondary} is unavailable.`
+  if (secondaryAvailable) return `Auto will use ${secondary}; ${primary} is unavailable.`
+  if (kind === "openrouter") return `Auto will use OpenRouter with ${img.model || "the default model"}.`
+  if (kind === "openai") return "Auto will use OpenAI API with gpt-image-1."
+  return "Auto needs an OpenAI or OpenRouter API key."
+}
+
+function keyModelSummary(img: ImageSettings | null, apiKeyDraft: string): string {
+  const kind = keyKind(apiKeyDraft)
+  if (kind === "openrouter") {
+    const model = img?.model || "google/gemini-3.1-flash-image-preview"
+    const details = modelDetails(model)
+    return `This OpenRouter key uses ${details.name} (${model}).`
+  }
+  if (kind === "openai") {
+    return "This OpenAI key uses gpt-image-1 at high quality."
+  }
+  return "Save an OpenAI or OpenRouter key to see its model."
+}
+
 /**
- * Settings: the image-generation backend + model, and the telemetry opt-out.
- * The only place either is surfaced in the app.
+ * Settings: the image-generation backend + model, API key, and telemetry opt-out.
  */
 export function SettingsModal({ onClose }: { onClose: () => void }) {
-  // `optOut === true` means telemetry is OFF. null while loading.
   const [optOut, setOptOut] = useState<boolean | null>(null)
   const [img, setImg] = useState<ImageSettings | null>(null)
+  const [apiKey, setApiKey] = useState("")
+  const [apiKeyDraft, setApiKeyDraft] = useState("")
+  const [keyBusy, setKeyBusy] = useState(false)
+  const [keyError, setKeyError] = useState<string | null>(null)
+  const [keySaved, setKeySaved] = useState(false)
+  const [keyVisible, setKeyVisible] = useState(false)
 
   useEffect(() => {
     ipc.app
@@ -37,6 +167,10 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
           model?: string
           codexAvailable?: boolean
           codex_available?: boolean
+          geminiAvailable?: boolean
+          gemini_available?: boolean
+          freeBackendPreference?: string
+          free_backend_preference?: string
           hasKey?: boolean
           has_key?: boolean
           suggestedModels?: string[]
@@ -46,14 +180,37 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
           backend: resp.backend || "auto",
           model: resp.model || "",
           codexAvailable: resp.codexAvailable ?? resp.codex_available ?? false,
+          geminiAvailable: resp.geminiAvailable ?? resp.gemini_available ?? false,
+          freeBackendPreference: normalizeFreeBackendPreference(
+            resp.freeBackendPreference ?? resp.free_backend_preference
+          ),
           hasKey: resp.hasKey ?? resp.has_key ?? false,
           suggestedModels: resp.suggestedModels ?? resp.suggested_models ?? [],
         })
       })
       .catch(() => {})
+
+    ipc.app
+      .GetStoredOpenAIApiKey({})
+      .then((r) => {
+        const saved = r.apiKey ?? ""
+        setApiKey(saved)
+        setApiKeyDraft(saved)
+      })
+      .catch(() => {})
   }, [])
 
   const telemetryOn = optOut === false
+  const kind = keyKind(apiKeyDraft)
+  const keyDirty = apiKeyDraft.trim() !== apiKey
+  const canSaveKey = keyDirty && !keyBusy
+  const routeWarning =
+    img?.backend === "openrouter" && kind !== "openrouter"
+      ? "OpenRouter needs an sk-or key."
+      : img?.backend === "openai" && kind !== "openai"
+        ? "OpenAI API needs an OpenAI key."
+        : null
+
   const toggleTelemetry = () => {
     if (optOut === null) return
     const next = !optOut
@@ -63,17 +220,89 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
 
   const saveImg = (next: ImageSettings) => {
     setImg(next)
-    ipc.app.SetImageSettings({ backend: next.backend, model: next.model }).catch(() => {})
+    ipc.app
+      .SetImageSettings({
+        backend: next.backend,
+        model: next.model,
+        freeBackendPreference: next.freeBackendPreference,
+      })
+      .catch(() => {})
+  }
+
+  const saveKey = async () => {
+    if (!canSaveKey) return
+    setKeyBusy(true)
+    setKeyError(null)
+    setKeySaved(false)
+    const trimmed = apiKeyDraft.trim()
+    try {
+      const res = await ipc.app.SetOpenAIApiKey({ apiKey: trimmed })
+      if (res.error) {
+        setKeyError(res.error)
+      } else {
+        setApiKey(trimmed)
+        setApiKeyDraft(trimmed)
+        setImg((cur) => (cur ? { ...cur, hasKey: trimmed.length > 0 } : cur))
+        setKeySaved(true)
+      }
+    } catch {
+      setKeyError("Could not save the API key.")
+    } finally {
+      setKeyBusy(false)
+    }
+  }
+
+  const clearKey = async () => {
+    setApiKeyDraft("")
+    setKeyBusy(true)
+    setKeyError(null)
+    setKeySaved(false)
+    try {
+      const res = await ipc.app.SetOpenAIApiKey({ apiKey: "" })
+      if (res.error) {
+        setKeyError(res.error)
+      } else {
+        setApiKey("")
+        setImg((cur) => (cur ? { ...cur, hasKey: false } : cur))
+        setKeySaved(true)
+      }
+    } catch {
+      setKeyError("Could not clear the API key.")
+    } finally {
+      setKeyBusy(false)
+    }
   }
 
   const backends = [
-    { id: "auto", label: "Auto", hint: "Key if set, else free" },
-    ...(img?.codexAvailable
-      ? [{ id: "codex", label: "Free", hint: "Your ChatGPT sub" }]
-      : []),
-    { id: "openrouter", label: "OpenRouter", hint: "Your API key" },
+    {
+      id: "auto",
+      label: "Auto",
+      hint:
+        img?.freeBackendPreference === "gemini"
+          ? "Gemini, Codex, then key"
+          : "Codex, Gemini, then key",
+      disabled: false,
+    },
+    {
+      id: "codex",
+      label: "Codex",
+      hint: img?.codexAvailable ? "Signed-in app subscription" : "Codex app not found",
+      disabled: img != null && !img.codexAvailable,
+    },
+    {
+      id: "gemini",
+      label: "Gemini",
+      hint: img?.geminiAvailable ? "Signed-in Gemini CLI" : "Gemini CLI not found",
+      disabled: img != null && !img.geminiAvailable,
+    },
+    { id: "openrouter", label: "OpenRouter", hint: "sk-or key + model picker", disabled: false },
+    { id: "openai", label: "OpenAI", hint: "sk key + gpt-image-1", disabled: false },
   ]
-  const showModel = img != null && img.backend !== "codex"
+
+  const showOpenRouterModel =
+    img != null &&
+    (img.backend === "openrouter" ||
+      (img.backend === "auto" && keyKind(apiKeyDraft) === "openrouter"))
 
   return (
     <div
@@ -84,92 +313,207 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
       onClick={onClose}
     >
       <div
-        className="relative w-[460px] max-w-[calc(100vw-32px)] rounded-xl border border-border bg-background shadow-2xl"
+        className="relative max-h-[calc(100vh-32px)] w-[560px] max-w-[calc(100vw-32px)] overflow-y-auto rounded-xl border border-border bg-background shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between px-4 pt-4 pb-2">
+        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-background/95 px-4 py-3 backdrop-blur">
           <h2 id="settings-title" className="font-medium text-foreground">
             Settings
           </h2>
           <button
             type="button"
             onClick={onClose}
-            className="flex items-center justify-center h-8 w-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-foreground/5 transition-colors"
+            className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-[background-color,color] hover:bg-foreground/5 hover:text-foreground active:scale-[0.96]"
             aria-label="Close"
           >
-            <X className="w-4 h-4" />
+            <X className="h-4 w-4" />
           </button>
         </div>
 
-        <div className="px-4 pb-4 space-y-3">
-          {/* Image generation */}
+        <div className="space-y-3 px-4 py-4">
           <div className="rounded-xl border border-border bg-secondary/30 p-3.5">
             <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-              <Sparkles className="w-4 h-4 text-muted-foreground" />
+              <Sparkles className="h-4 w-4 text-muted-foreground" />
               Image generation
             </div>
 
+            <div className="mt-3 flex items-center gap-2 rounded-lg bg-background/70 px-3 py-2 text-xs text-muted-foreground ring-1 ring-border">
+              <Route className="h-3.5 w-3.5 shrink-0" />
+              <span className="min-w-0 flex-1">{routeSummary(img, apiKeyDraft)}</span>
+            </div>
+
             <div className="mt-3 text-xs font-medium text-muted-foreground">Backend</div>
-            <div className="mt-1.5 flex gap-1.5">
+            <div className="mt-1.5 grid grid-cols-2 gap-1.5">
               {backends.map((b) => {
                 const active = (img?.backend || "auto") === b.id
                 return (
                   <button
                     key={b.id}
                     type="button"
-                    disabled={img == null}
+                    disabled={img == null || b.disabled}
                     onClick={() => img && saveImg({ ...img, backend: b.id })}
                     className={cn(
-                      "flex-1 rounded-lg border px-2 py-1.5 text-left transition-colors",
+                      "min-h-14 rounded-lg border px-2.5 py-2 text-left transition-[background-color,border-color,box-shadow,transform]",
+                      "disabled:cursor-not-allowed disabled:opacity-45",
                       active
-                        ? "border-primary bg-primary/10"
-                        : "border-border bg-secondary/30 hover:border-foreground/30"
+                        ? "border-primary bg-primary/10 shadow-[0_1px_2px_-1px_rgba(28,26,23,0.16)]"
+                        : "border-border bg-background/50 hover:border-foreground/30 hover:bg-background/80 active:scale-[0.99]"
                     )}
                   >
-                    <div className="text-xs font-medium text-foreground">{b.label}</div>
-                    <div className="text-[10px] text-muted-foreground leading-tight">{b.hint}</div>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs font-medium text-foreground">{b.label}</span>
+                      {active && <Check className="h-3.5 w-3.5 text-muted-foreground" />}
+                    </div>
+                    <div className="mt-0.5 text-[10px] leading-tight text-muted-foreground">
+                      {b.hint}
+                    </div>
                   </button>
                 )
               })}
             </div>
 
-            {img && !img.codexAvailable && (
-              <p className="text-[11px] text-muted-foreground mt-2">
-                Install the Codex CLI and run <code className="font-mono">codex login</code> to
-                generate free on your ChatGPT subscription.
-              </p>
+            {img && (
+              <div className="mt-3 rounded-lg bg-background/60 p-2 ring-1 ring-border">
+                <div className="flex items-center justify-between gap-2 px-0.5">
+                  <div className="text-xs font-medium text-muted-foreground">Auto order</div>
+                  <div className="text-[10px] text-muted-foreground/70">Used when Backend is Auto</div>
+                </div>
+                <div className="mt-1.5 grid grid-cols-2 gap-1.5">
+                  {(["codex", "gemini"] as const).map((value) => {
+                    const active = img.freeBackendPreference === value
+                    const available = value === "codex" ? img.codexAvailable : img.geminiAvailable
+                    const label = value === "codex" ? "Codex first" : "Gemini first"
+                    const fallback = value === "codex" ? "then Gemini" : "then Codex"
+                    return (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => saveImg({ ...img, freeBackendPreference: value })}
+                        className={cn(
+                          "min-h-11 rounded-lg border px-2.5 py-1.5 text-left transition-[background-color,border-color,box-shadow,transform]",
+                          active
+                            ? "border-primary bg-primary/10 shadow-[0_1px_2px_-1px_rgba(28,26,23,0.16)]"
+                            : "border-border bg-secondary/20 hover:border-foreground/30 hover:bg-background/80 active:scale-[0.99]"
+                        )}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-xs font-medium text-foreground">{label}</span>
+                          {active && <Check className="h-3.5 w-3.5 text-muted-foreground" />}
+                        </div>
+                        <div className="mt-0.5 text-[10px] leading-tight text-muted-foreground">
+                          {available ? fallback : "skips if unavailable"}
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
             )}
 
-            {showModel && (
-              <div className="mt-3">
-                <label
-                  htmlFor="or-model"
-                  className="block text-xs font-medium text-muted-foreground mb-1.5"
-                >
-                  OpenRouter model
-                </label>
-                <input
-                  id="or-model"
-                  value={img.model}
-                  onChange={(e) => saveImg({ ...img, model: e.target.value })}
-                  spellCheck={false}
-                  placeholder="google/gemini-2.5-flash-image"
-                  className="w-full rounded-lg border border-border bg-secondary/20 px-3 h-8 font-mono text-xs text-foreground outline-none focus:border-foreground/40"
-                />
-                <p className="text-[11px] text-muted-foreground mt-1">
-                  Any image-output model on OpenRouter.
-                </p>
-              </div>
+            {showOpenRouterModel && img && (
+              <ModelPicker
+                value={img.model}
+                suggestions={img.suggestedModels}
+                onChange={(model) => saveImg({ ...img, model })}
+              />
             )}
           </div>
 
-          {/* Telemetry */}
+          <div className="rounded-xl border border-border bg-secondary/30 p-3.5">
+            <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+              <KeyRound className="h-4 w-4 text-muted-foreground" />
+              API key
+            </div>
+
+            <div className="mt-3 flex items-center gap-2">
+              <div className="relative min-w-0 flex-1">
+                <input
+                  type={keyVisible ? "text" : "password"}
+                  value={apiKeyDraft}
+                  onChange={(e) => {
+                    setApiKeyDraft(e.target.value)
+                    setKeySaved(false)
+                    setKeyError(null)
+                  }}
+                  autoComplete="off"
+                  spellCheck={false}
+                  placeholder="sk-... or sk-or-..."
+                  className="h-9 w-full rounded-lg border border-border bg-background/70 px-3 pr-9 font-mono text-xs text-foreground outline-none transition-[border-color,box-shadow] placeholder:text-muted-foreground focus:border-foreground/40 focus:ring-2 focus:ring-foreground/[0.06]"
+                />
+                <button
+                  type="button"
+                  onClick={() => setKeyVisible((v) => !v)}
+                  className="absolute right-1 top-1 flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-[background-color,color] hover:bg-foreground/5 hover:text-foreground active:scale-[0.96]"
+                  aria-label={keyVisible ? "Hide API key" : "Show API key"}
+                >
+                  {keyVisible ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                </button>
+              </div>
+
+              <button
+                type="button"
+                disabled={!canSaveKey}
+                onClick={() => void saveKey()}
+                className={cn(
+                  "h-9 rounded-lg px-3 text-xs font-medium transition-[background-color,color,transform]",
+                  canSaveKey
+                    ? "bg-primary text-primary-foreground hover:bg-primary/90 active:scale-[0.96]"
+                    : "cursor-not-allowed bg-secondary text-muted-foreground/60"
+                )}
+              >
+                {keyBusy ? "Saving..." : "Save"}
+              </button>
+            </div>
+
+            <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
+              <span>{keyKindLabel(kind)}</span>
+              {routeWarning && <span className="text-destructive">{routeWarning}</span>}
+              {keyError && <span className="text-destructive">{keyError}</span>}
+              {keySaved && !keyError && <span className="text-foreground/70">Saved</span>}
+            </div>
+
+            <div className="mt-2 rounded-lg bg-background/60 px-3 py-2 text-xs text-muted-foreground ring-1 ring-border">
+              {keyModelSummary(img, apiKeyDraft)}
+            </div>
+
+            <div className="mt-3 flex items-center justify-between gap-2">
+              <div className="flex gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => openExternal(OPENAI_API_KEYS_HELP_URL)}
+                  className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-background/70 px-2.5 text-xs font-medium text-muted-foreground ring-1 ring-border transition-[background-color,color,transform] hover:bg-background hover:text-foreground active:scale-[0.96]"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  OpenAI
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openExternal(OPENROUTER_API_KEYS_HELP_URL)}
+                  className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-background/70 px-2.5 text-xs font-medium text-muted-foreground ring-1 ring-border transition-[background-color,color,transform] hover:bg-background hover:text-foreground active:scale-[0.96]"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  OpenRouter
+                </button>
+              </div>
+              {apiKey && (
+                <button
+                  type="button"
+                  disabled={keyBusy}
+                  onClick={() => void clearKey()}
+                  className="h-8 rounded-lg px-2.5 text-xs font-medium text-muted-foreground transition-[background-color,color,transform] hover:bg-foreground/5 hover:text-foreground active:scale-[0.96] disabled:pointer-events-none disabled:opacity-50"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+          </div>
+
           <div className="rounded-xl border border-border bg-secondary/30 p-3.5">
             <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2 min-w-0">
-                <ShieldCheck className="w-4 h-4 shrink-0 text-muted-foreground" />
+              <div className="flex min-w-0 items-center gap-2">
+                <ShieldCheck className="h-4 w-4 shrink-0 text-muted-foreground" />
                 <div className="text-sm font-medium text-foreground">
-                  Share anonymous usage &amp; crash reports
+                  Share anonymous usage and crash reports
                 </div>
               </div>
 
@@ -183,7 +527,7 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
                 className={cn(
                   "relative h-6 w-10 shrink-0 rounded-full transition-colors duration-200",
                   optOut === null
-                    ? "bg-muted cursor-wait"
+                    ? "cursor-wait bg-muted"
                     : telemetryOn
                       ? "bg-primary"
                       : "bg-foreground/20"
@@ -197,13 +541,109 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
                 />
               </button>
             </div>
-            <p className="text-xs text-muted-foreground leading-relaxed mt-2 pl-6">
-              Helps fix bugs and decide what to build next. Never includes your prompts, your
-              avatar, your API key, or any generated image.
+            <p className="mt-2 pl-6 text-xs leading-relaxed text-muted-foreground">
+              When off, Nib does not send usage or crash events. When on, events are coarse and
+              exclude prompts, keys, avatars, and images.
             </p>
           </div>
         </div>
       </div>
+    </div>
+  )
+}
+
+function ModelPicker({
+  value,
+  suggestions,
+  onChange,
+}: {
+  value: string
+  suggestions: string[]
+  onChange: (model: string) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const selected = modelDetails(value)
+  const options = suggestions.length > 0 ? suggestions : Object.keys(MODEL_DETAILS)
+
+  return (
+    <div className="mt-3">
+      <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
+        OpenRouter model
+      </label>
+      <div
+        className="relative"
+        onBlur={(e) => {
+          if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setOpen(false)
+        }}
+      >
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          aria-haspopup="listbox"
+          aria-expanded={open}
+          className={cn(
+            "flex min-h-10 w-full items-center gap-2 rounded-lg bg-background/70 px-3 text-left ring-1 ring-border",
+            "transition-[background-color,box-shadow,transform] hover:bg-background active:scale-[0.99]",
+            "focus:outline-none focus-visible:ring-2 focus-visible:ring-foreground/25"
+          )}
+        >
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-xs font-medium text-foreground">{selected.name}</span>
+            <span className="block truncate text-[10px] text-muted-foreground">{value || selected.note}</span>
+          </span>
+          <ChevronDown
+            className={cn(
+              "h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform",
+              open && "rotate-180"
+            )}
+          />
+        </button>
+
+        {open && (
+          <div
+            role="listbox"
+            aria-label="OpenRouter model suggestions"
+            className="absolute left-0 right-0 top-full z-30 mt-1 max-h-64 overflow-y-auto rounded-lg bg-card p-1 shadow-[0_0_0_1px_rgba(28,26,23,0.08),0_12px_32px_-12px_rgba(28,26,23,0.3)]"
+          >
+            {options.map((model) => {
+              const details = modelDetails(model)
+              const active = model === value
+              return (
+                <button
+                  key={model}
+                  type="button"
+                  role="option"
+                  aria-selected={active}
+                  onClick={() => {
+                    onChange(model)
+                    setOpen(false)
+                  }}
+                  className={cn(
+                    "flex min-h-10 w-full items-center gap-2 rounded-md px-2 text-left transition-[background-color,color]",
+                    active
+                      ? "bg-secondary/70 text-foreground"
+                      : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
+                  )}
+                >
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-xs font-medium">{details.name}</span>
+                    <span className="block truncate font-mono text-[10px]">{model}</span>
+                  </span>
+                  {active && <Check className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
+                </button>
+              )
+            })}
+          </div>
+        )}
+      </div>
+
+      <input
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        spellCheck={false}
+        placeholder="google/gemini-3.1-flash-image-preview"
+        className="mt-1.5 h-8 w-full rounded-lg border border-border bg-background/70 px-3 font-mono text-xs text-foreground outline-none transition-[border-color,box-shadow] placeholder:text-muted-foreground focus:border-foreground/40 focus:ring-2 focus:ring-foreground/[0.06]"
+      />
     </div>
   )
 }

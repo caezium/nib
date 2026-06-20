@@ -3,7 +3,7 @@ import { AppContent } from "@/components/app-content"
 
 function App() {
   return (
-    <ThemeProvider>
+    <ThemeProvider defaultTheme="light">
       <AppContent />
     </ThemeProvider>
   )

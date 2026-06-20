@@ -57,7 +57,7 @@ export class OpenAIProvider implements ImageProvider {
     const apiKey = getResolvedOpenAIApiKey();
     if (!apiKey) {
       throw new Error(
-        "No OpenAI API key. Use the startup dialog or save a key in app preferences."
+        "No OpenAI API key. Save an OpenAI sk key in Settings, or switch to Auto/Codex."
       );
     }
 

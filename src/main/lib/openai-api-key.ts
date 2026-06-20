@@ -29,9 +29,6 @@ export function getResolvedApiKey(): string {
   return prefs.getString(API_KEY_PREFS_KEY).trim();
 }
 
-/** Backwards-compatible alias. */
-export const getResolvedOpenAIApiKey = getResolvedApiKey;
-
 /**
  * Infer which provider a key belongs to from its prefix.
  *
@@ -41,4 +38,16 @@ export const getResolvedOpenAIApiKey = getResolvedApiKey;
  */
 export function detectProviderFromKey(key: string): 'openai' | 'openrouter' {
   return key.trim().startsWith('sk-or-') ? 'openrouter' : 'openai';
+}
+
+/** Saved key only when it belongs to OpenAI. */
+export function getResolvedOpenAIApiKey(): string {
+  const key = getResolvedApiKey();
+  return key && detectProviderFromKey(key) === 'openai' ? key : '';
+}
+
+/** Saved key only when it belongs to OpenRouter. */
+export function getResolvedOpenRouterApiKey(): string {
+  const key = getResolvedApiKey();
+  return key && detectProviderFromKey(key) === 'openrouter' ? key : '';
 }

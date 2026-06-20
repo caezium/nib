@@ -2,8 +2,14 @@ import { OpenAIProvider } from "./providers/openai";
 import { OpenRouterProvider } from "./providers/openrouter";
 import { MockImageProvider } from "./providers/mock";
 import { CodexProvider } from "./providers/codex";
+import { GeminiProvider } from "./providers/gemini";
 import { getResolvedApiKey, detectProviderFromKey } from "./openai-api-key";
-import { getBackendSetting, codexAvailable } from "./app-settings";
+import {
+  getBackendSetting,
+  getFreeBackendPreference,
+  codexAvailable,
+  geminiAvailable,
+} from "./app-settings";
 
 // ---------------------------------------------------------------------------
 // Public interface
@@ -41,13 +47,23 @@ export interface ImageProvider {
 // Supported providers
 // ---------------------------------------------------------------------------
 
-export type ProviderName = "openai" | "openrouter" | "codex" | "mock";
+export type ProviderName = "openai" | "openrouter" | "codex" | "gemini" | "mock";
 
 // ---------------------------------------------------------------------------
 // Provider resolution — one cached instance per provider name
 // ---------------------------------------------------------------------------
 
 const _instances: Partial<Record<ProviderName, ImageProvider>> = {};
+
+function firstFreeProvider(): ProviderName | null {
+  const order: Array<"codex" | "gemini"> =
+    getFreeBackendPreference() === "gemini" ? ["gemini", "codex"] : ["codex", "gemini"];
+  for (const provider of order) {
+    if (provider === "codex" && codexAvailable()) return "codex";
+    if (provider === "gemini" && geminiAvailable()) return "gemini";
+  }
+  return null;
+}
 
 /**
  * Resolve the active provider name.
@@ -60,19 +76,42 @@ const _instances: Partial<Record<ProviderName, ImageProvider>> = {};
  */
 export function resolveProviderName(): ProviderName {
   const forced = process.env.ICON_PROVIDER?.trim();
-  if (forced === "mock" || forced === "openai" || forced === "openrouter" || forced === "codex") {
+  if (
+    forced === "mock" ||
+    forced === "openai" ||
+    forced === "openrouter" ||
+    forced === "codex" ||
+    forced === "gemini"
+  ) {
     return forced;
   }
-  // A user-chosen backend (Settings) overrides auto-detection.
+  // A user-chosen backend (Settings) usually overrides auto-detection. If the
+  // chosen API-key lane has no key, fall back to Codex when it is available so
+  // stale settings do not trap the app in a dead "No API key" state.
   const setting = getBackendSetting();
-  if (setting === "mock" || setting === "openai" || setting === "openrouter" || setting === "codex") {
+  if (setting === "mock") return "mock";
+  if (setting === "codex" || setting === "gemini") {
+    const usable = setting === "codex" ? codexAvailable() : geminiAvailable();
+    if (usable) return setting;
+    // The saved free lane isn't usable (not installed / logged out / no image
+    // feature). Fall back so a stale setting doesn't fail every generation:
+    // the other free lane, else a saved API key, else the choice as-is.
+    const free = firstFreeProvider();
+    if (free) return free;
+    const key = getResolvedApiKey();
+    if (key) return detectProviderFromKey(key);
     return setting;
   }
-  // auto: a stored key picks its provider; with no key, fall back to the free
-  // Codex lane when available, else OpenAI (which will prompt for a key).
+  if (setting === "openai" || setting === "openrouter") {
+    const free = firstFreeProvider();
+    return getResolvedApiKey() || !free ? setting : free;
+  }
+  // auto: prefer no-key subscription/CLI lanes first, then fall back to the
+  // saved API key, else OpenAI (which will prompt for a key).
+  const free = firstFreeProvider();
+  if (free) return free;
   const key = getResolvedApiKey();
   if (key) return detectProviderFromKey(key);
-  if (codexAvailable()) return "codex";
   return "openai";
 }
 
@@ -100,6 +139,9 @@ export function getProvider(): ImageProvider {
     case "codex":
       created = new CodexProvider();
       break;
+    case "gemini":
+      created = new GeminiProvider();
+      break;
     default:
       created = new OpenAIProvider();
   }
@@ -112,8 +154,21 @@ export function getProvider(): ImageProvider {
 // ---------------------------------------------------------------------------
 
 /**
+ * A failure that retrying cannot fix (bad API key, out of credits, …). Throw
+ * this instead of a plain Error so `withRetry` surfaces it immediately rather
+ * than burning the full backoff budget on a request that can never succeed.
+ */
+export class TerminalError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "TerminalError";
+  }
+}
+
+/**
  * Run `fn` up to `maxAttempts` times.  On failure before the last attempt,
  * waits `initialDelayMs × attempt` milliseconds before retrying (linear back-off).
+ * A `TerminalError` short-circuits the loop and is rethrown at once.
  */
 export async function withRetry<T>(
   fn: () => Promise<T>,
@@ -126,6 +181,7 @@ export async function withRetry<T>(
       return await fn();
     } catch (err) {
       lastError = err;
+      if (err instanceof TerminalError) throw err;
       if (attempt < maxAttempts) {
         await new Promise<void>((r) => setTimeout(r, initialDelayMs * attempt));
       }

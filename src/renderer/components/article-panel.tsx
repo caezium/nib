@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useState } from "react"
-import { Download, ImageIcon, Link2, Loader2, RefreshCw, Sparkles } from "lucide-react"
+import { Download, ImageIcon, Link2, Loader2, Maximize2, RefreshCw, Sparkles } from "lucide-react"
 import { ipc } from "@/gen/ipc"
 import type { Shot } from "@/gen/app"
-import { StylePicker, type StyleOption } from "@/components/style-picker"
 import { EXAMPLE_ARTICLES, EXAMPLE_ARTICLE_URLS } from "@/lib/examples"
 import { cn } from "@/lib/utils"
 
@@ -35,16 +34,13 @@ function looksLikeUrl(s: string): boolean {
 
 export function ArticlePanel({
   style,
-  styles,
-  onStyleChange,
   onZoom,
   avatarReady,
   onNeedAvatar,
   onDirtyChange,
 }: {
+  /** The look id, chosen in the rail; applied to every shot. */
   style: string
-  styles: StyleOption[]
-  onStyleChange: (id: string) => void
   onZoom?: (src: string) => void
   /** Whether the persistent avatar is set; generation is gated on it. */
   avatarReady: boolean
@@ -162,24 +158,27 @@ export function ArticlePanel({
     setBatchRunning(false)
   }, [batchRunning, shots, generateOne, avatarReady, onNeedAvatar])
 
-  const save = useCallback(async (i: number) => {
-    const img = results[i]?.image
-    if (!img) return
-    setSaveError(null)
-    try {
-      const buffer = await (await fetch(img)).arrayBuffer()
-      const res = await ipc.app.SaveIcon({ imageData: new Uint8Array(buffer) })
-      if (res.error) {
-        setSaveError(res.error)
-        return
+  const save = useCallback(
+    async (i: number) => {
+      const img = results[i]?.image
+      if (!img) return
+      setSaveError(null)
+      try {
+        const buffer = await (await fetch(img)).arrayBuffer()
+        const res = await ipc.app.SaveIcon({ imageData: new Uint8Array(buffer) })
+        if (res.error) {
+          setSaveError(res.error)
+          return
+        }
+        if (!res.canceled && res.imagePath) {
+          setResults((prev) => prev.map((x, j) => (j === i ? { ...x, saved: true } : x)))
+        }
+      } catch {
+        setSaveError("Could not save the image.")
       }
-      if (!res.canceled && res.imagePath) {
-        setResults((prev) => prev.map((x, j) => (j === i ? { ...x, saved: true } : x)))
-      }
-    } catch {
-      setSaveError("Could not save the image.")
-    }
-  }, [results])
+    },
+    [results]
+  )
 
   const reset = useCallback(() => {
     setShots([])
@@ -198,190 +197,242 @@ export function ArticlePanel({
 
   const hasShots = shots.length > 0
 
-  return (
-    <div className="flex flex-col h-full w-full max-w-[680px] mx-auto px-4 pt-20 pb-4 gap-3 overflow-hidden">
-      {/* Style picker — applies to every shot. */}
-      <div className="shrink-0">
-        <StylePicker styles={styles} value={style} onChange={onStyleChange} disabled={batchRunning} />
-      </div>
-
-      {/* Article input */}
-      {!hasShots && (
-        <>
-          {!article.trim() && (
-            <div className="flex flex-wrap items-center gap-2 shrink-0">
-              <span className="text-xs text-muted-foreground">Try an example:</span>
-              {EXAMPLE_ARTICLES.map((a, i) => (
-                <button
-                  key={i}
-                  type="button"
-                  onClick={() => setArticle(a.body)}
-                  className="px-2.5 h-7 rounded-full text-xs font-medium border border-border bg-secondary/40 text-muted-foreground hover:text-foreground hover:bg-secondary/70 transition-colors"
-                >
-                  {a.title}
-                </button>
-              ))}
-            </div>
-          )}
-          {!article.trim() && (
-            <div className="flex flex-wrap items-center gap-2 shrink-0">
-              <span className="text-xs text-muted-foreground">Or fetch a URL:</span>
-              {EXAMPLE_ARTICLE_URLS.map((a, i) => (
-                <button
-                  key={i}
-                  type="button"
-                  disabled={fetching}
-                  onClick={() => void fetchFromUrl(a.url)}
-                  className="flex items-center gap-1.5 px-2.5 h-7 rounded-full text-xs font-medium border border-border bg-secondary/40 text-muted-foreground hover:text-foreground hover:bg-secondary/70 transition-colors disabled:opacity-50"
-                >
-                  <Link2 className="w-3 h-3" />
-                  {a.label}
-                </button>
-              ))}
-            </div>
-          )}
-          <textarea
-            value={article}
-            onChange={(e) => setArticle(e.target.value)}
-            placeholder="Paste an article or a URL — or pick an example. Nib picks 4–8 ideas to illustrate."
-            className={cn(
-              "w-full flex-1 min-h-[200px] rounded-2xl border border-border bg-secondary/40 p-4",
-              "text-sm text-foreground placeholder:text-muted-foreground resize-none outline-none",
-              "focus:border-border/80 focus:bg-secondary/60 transition-colors"
-            )}
-            style={{ scrollbarWidth: "thin" }}
-          />
-          {(planError || fetchError) && (
-            <p className="text-xs text-destructive" role="alert">
-              {fetchError || planError}
-            </p>
-          )}
-          <div className="flex justify-end">
-            {isUrl ? (
-              <button
-                type="button"
-                disabled={fetching}
-                onClick={() => void fetchFromUrl()}
-                title="Fetch the article text from this URL"
-                className="flex items-center gap-2 h-9 px-4 rounded-xl text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
-              >
-                {fetching ? <Loader2 className="w-4 h-4 animate-spin" /> : <Link2 className="w-4 h-4" />}
-                {fetching ? "Fetching…" : "Fetch article"}
-              </button>
-            ) : (
-              <button
-                type="button"
-                disabled={!article.trim() || planning}
-                onClick={() => void makeShotList()}
-                className="flex items-center gap-2 h-9 px-4 rounded-xl text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
-              >
-                {planning ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                {planning ? "Planning…" : "Make shot list"}
-              </button>
-            )}
-          </div>
-        </>
-      )}
-
-      {/* Shot list + results */}
-      {hasShots && (
-        <>
-          <div className="flex items-center justify-between shrink-0">
-            <span className="text-sm text-muted-foreground">
-              {shots.length} shots
+  // ── Shot list + results ────────────────────────────────────────────────
+  if (hasShots) {
+    const doneCount = results.filter((r) => r.image).length
+    return (
+      <div className="flex h-full w-full flex-col overflow-hidden px-6 pt-4 pb-6">
+        <div className="mb-4 flex shrink-0 items-center justify-between">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <span className="tnum">
+              {shots.length} {shots.length === 1 ? "idea" : "ideas"}
             </span>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={reset}
-                className="h-8 px-3 rounded-lg text-xs font-medium bg-secondary/60 text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
-              >
-                New article
-              </button>
-              <button
-                type="button"
-                disabled={batchRunning}
-                onClick={() => void generateAll()}
-                className="flex items-center gap-1.5 h-8 px-4 rounded-lg text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
-              >
-                {batchRunning ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-                {batchRunning ? "Generating…" : "Generate all"}
-              </button>
-            </div>
+            {doneCount > 0 && <span className="text-muted-foreground/60 tnum">· {doneCount} drawn</span>}
           </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={reset}
+              className="h-8 px-3 rounded-md text-xs font-medium text-muted-foreground transition-[transform,color,background-color] hover:text-foreground hover:bg-foreground/5 active:scale-[0.97]"
+            >
+              New article
+            </button>
+            <button
+              type="button"
+              disabled={batchRunning}
+              onClick={() => void generateAll()}
+              className="flex items-center gap-1.5 h-8 px-4 rounded-md text-xs font-medium bg-primary text-primary-foreground shadow-sm transition-[transform,background-color] hover:bg-primary/90 active:scale-[0.97] disabled:opacity-50 disabled:active:scale-100"
+            >
+              {batchRunning ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+              {batchRunning ? "Drawing…" : "Generate all"}
+            </button>
+          </div>
+        </div>
 
-          {saveError && (
-            <p className="text-xs text-destructive shrink-0" role="alert">
-              {saveError}
-            </p>
-          )}
+        {saveError && (
+          <p className="mb-2 shrink-0 text-xs text-destructive" role="alert">
+            {saveError}
+          </p>
+        )}
 
-          <div className="flex-1 overflow-y-auto pr-1 space-y-3" style={{ scrollbarWidth: "thin" }}>
-            {shots.map((shot, i) => {
-              const r = results[i] ?? { status: "idle", image: null }
-              return (
+        <div className="grid flex-1 min-h-0 auto-rows-min grid-cols-[repeat(auto-fill,minmax(250px,1fr))] gap-4 overflow-y-auto pr-1">
+          {shots.map((shot, i) => {
+            const r = results[i] ?? { status: "idle", image: null }
+            return (
+              <figure
+                key={i}
+                className="group plate-in flex flex-col"
+                style={{ animationDelay: `${Math.min(i, 5) * 45}ms` }}
+              >
                 <div
-                  key={i}
-                  className="rounded-2xl border border-border bg-secondary/30 p-3 flex gap-3"
+                  className={cn(
+                    "relative overflow-hidden rounded-lg bg-white ring-1 ring-border",
+                    "shadow-[0_1px_2px_-1px_rgba(28,26,23,0.05),0_5px_14px_-10px_rgba(28,26,23,0.14)]"
+                  )}
                 >
-                  {/* 16:9 image slot */}
-                  <div className="relative w-[200px] shrink-0 aspect-[16/9] rounded-lg overflow-hidden bg-white flex items-center justify-center">
+                  <div className="relative flex aspect-[16/9] items-center justify-center">
                     {r.image ? (
                       <img
                         src={r.image}
                         alt={shot.theme}
-                        className="w-full h-full object-contain cursor-zoom-in"
+                        className="h-full w-full cursor-zoom-in object-contain"
                         draggable={false}
                         onClick={() => onZoom?.(r.image!)}
                       />
                     ) : r.status === "generating" ? (
-                      <Loader2 className="w-6 h-6 text-muted-foreground animate-spin" />
-                    ) : (
-                      <ImageIcon className="w-6 h-6 text-muted-foreground/40" />
-                    )}
-                  </div>
-
-                  {/* Meta + actions */}
-                  <div className="flex flex-col min-w-0 flex-1">
-                    <span className="text-sm font-medium text-foreground truncate">{shot.theme}</span>
-                    <span className="text-xs text-muted-foreground leading-relaxed line-clamp-3 mt-0.5">
-                      {shot.coreIdea}
-                    </span>
-                    {shot.labels.length > 0 && (
-                      <span className="text-[10px] text-muted-foreground/70 mt-1 truncate">
-                        labels: {shot.labels.join(", ")}
+                      <span className="flex gap-1 text-muted-foreground/70" aria-hidden>
+                        <span className="thinking-dot" />
+                        <span className="thinking-dot" />
+                        <span className="thinking-dot" />
                       </span>
+                    ) : (
+                      <ImageIcon className="h-6 w-6 text-muted-foreground/30" strokeWidth={1.5} />
                     )}
-                    {r.status === "error" && (
-                      <span className="text-xs text-destructive mt-1">Generation failed.</span>
-                    )}
-                    <div className="flex items-center gap-2 mt-auto pt-2">
-                      <button
-                        type="button"
-                        disabled={r.status === "generating"}
-                        onClick={() => void generateOne(i)}
-                        className="flex items-center gap-1.5 h-7 px-3 rounded-lg text-xs font-medium bg-secondary/60 text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors disabled:opacity-50"
-                      >
-                        <RefreshCw className="w-3 h-3" />
-                        {r.image ? "Redo" : "Generate"}
-                      </button>
-                      <button
-                        type="button"
-                        disabled={!r.image}
-                        onClick={() => void save(i)}
-                        className="flex items-center gap-1.5 h-7 px-3 rounded-lg text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-40"
-                      >
-                        <Download className="w-3 h-3" />
-                        Save
-                      </button>
-                    </div>
                   </div>
+                  {r.image && onZoom && (
+                    <button
+                      type="button"
+                      onClick={() => onZoom(r.image!)}
+                      title="View larger"
+                      aria-label="View larger"
+                      className="absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-md bg-black/50 text-white opacity-0 backdrop-blur-sm transition-[opacity,transform,background-color] hover:bg-black/75 active:scale-[0.95] group-hover:opacity-100"
+                    >
+                      <Maximize2 className="h-3.5 w-3.5" />
+                    </button>
+                  )}
                 </div>
-              )
-            })}
+
+                <figcaption className="mt-2 flex flex-1 flex-col px-0.5">
+                  <span className="truncate text-[13px] font-medium text-foreground">{shot.theme}</span>
+                  <span className="mt-0.5 line-clamp-2 text-[12px] leading-snug text-muted-foreground">
+                    {shot.coreIdea}
+                  </span>
+                  {r.status === "error" && (
+                    <span className="mt-1 text-[11px] text-destructive">Generation failed.</span>
+                  )}
+                  <div className="mt-2 flex items-center gap-1.5 pt-0.5">
+                    <button
+                      type="button"
+                      disabled={r.status === "generating"}
+                      onClick={() => void generateOne(i)}
+                      className="flex h-7 items-center gap-1.5 rounded-md px-2.5 text-[11px] font-medium text-muted-foreground transition-[transform,color,background-color] hover:bg-foreground/5 hover:text-foreground active:scale-[0.97] disabled:opacity-50"
+                    >
+                      <RefreshCw className="h-3 w-3" />
+                      {r.image ? "Redo" : "Draw"}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!r.image}
+                      onClick={() => void save(i)}
+                      className={cn(
+                        "flex h-7 items-center gap-1.5 rounded-md px-2.5 text-[11px] font-medium transition-[transform,color,background-color] active:scale-[0.97]",
+                        r.saved
+                          ? "text-muted-foreground"
+                          : "text-foreground hover:bg-foreground/5 disabled:text-muted-foreground/40 disabled:active:scale-100"
+                      )}
+                    >
+                      <Download className="h-3 w-3" />
+                      {r.saved ? "Saved" : "Save"}
+                    </button>
+                  </div>
+                </figcaption>
+              </figure>
+            )
+          })}
+        </div>
+      </div>
+    )
+  }
+
+  // ── Article input ──────────────────────────────────────────────────────
+  return (
+    <div className="flex h-full w-full justify-center overflow-y-auto px-6 pt-[6vh] pb-6">
+      <div className="flex w-full max-w-[600px] flex-col">
+        <h2 className="text-pretty text-[15px] font-medium text-foreground">
+          Turn an article into a set
+        </h2>
+        <p className="mt-1 mb-4 text-sm text-muted-foreground">
+          Paste a post or a URL. Nib picks the 4–8 load-bearing ideas and draws each one
+          starring your character, all in the same look.
+        </p>
+
+        <textarea
+          value={article}
+          onChange={(e) => setArticle(e.target.value)}
+          placeholder="Paste an article or a URL…"
+          className={cn(
+            "min-h-[200px] w-full resize-none rounded-lg border border-border bg-secondary/30 p-3.5",
+            "text-sm leading-relaxed text-foreground placeholder:text-muted-foreground outline-none",
+            "transition-[border-color,box-shadow] focus:border-foreground/40 focus:ring-2 focus:ring-foreground/[0.06]"
+          )}
+          style={{ scrollbarWidth: "thin" }}
+        />
+
+        {(planError || fetchError) && (
+          <p className="mt-2 text-xs text-destructive" role="alert">
+            {fetchError || planError}
+          </p>
+        )}
+
+        <div className="mt-3 flex items-center justify-between gap-3">
+          <p className="text-[11px] text-muted-foreground/70">
+            {isUrl ? "Looks like a URL — fetch it first" : "⌘↵ or Make shot list"}
+          </p>
+          {isUrl ? (
+            <button
+              type="button"
+              disabled={fetching}
+              onClick={() => void fetchFromUrl()}
+              className="flex h-9 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition-[transform,background-color] hover:bg-primary/90 active:scale-[0.97] disabled:opacity-50 disabled:active:scale-100"
+            >
+              {fetching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Link2 className="h-4 w-4" />}
+              {fetching ? "Fetching…" : "Fetch article"}
+            </button>
+          ) : (
+            <button
+              type="button"
+              disabled={!article.trim() || planning}
+              onClick={() => void makeShotList()}
+              className="flex h-9 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition-[transform,background-color] hover:bg-primary/90 active:scale-[0.97] disabled:opacity-50 disabled:active:scale-100"
+            >
+              {planning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+              {planning ? "Planning…" : "Make shot list"}
+            </button>
+          )}
+        </div>
+
+        {!article.trim() && (
+          <div className="mt-8 space-y-3">
+            <Picker label="Try a sample">
+              {EXAMPLE_ARTICLES.map((a, i) => (
+                <Chip key={i} onClick={() => setArticle(a.body)}>
+                  {a.title}
+                </Chip>
+              ))}
+            </Picker>
+            <Picker label="Or fetch a URL">
+              {EXAMPLE_ARTICLE_URLS.map((a, i) => (
+                <Chip key={i} disabled={fetching} onClick={() => void fetchFromUrl(a.url)} icon>
+                  {a.label}
+                </Chip>
+              ))}
+            </Picker>
           </div>
-        </>
-      )}
+        )}
+      </div>
     </div>
+  )
+}
+
+function Picker({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      <span className="mr-1 text-[11px] font-medium tracking-wide text-muted-foreground/70">{label}</span>
+      {children}
+    </div>
+  )
+}
+
+function Chip({
+  children,
+  onClick,
+  disabled,
+  icon,
+}: {
+  children: React.ReactNode
+  onClick: () => void
+  disabled?: boolean
+  icon?: boolean
+}) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      className="flex items-center gap-1.5 rounded-md border border-border bg-card px-2.5 h-7 text-xs text-muted-foreground transition-[transform,color,background-color,border-color] hover:border-foreground/30 hover:bg-secondary/40 hover:text-foreground active:scale-[0.97] disabled:opacity-50"
+    >
+      {icon && <Link2 className="h-3 w-3" />}
+      {children}
+    </button>
   )
 }

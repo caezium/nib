@@ -46,6 +46,53 @@ function appVersion(): string {
   }
 }
 
+function truncate(value: string, max = 240): string {
+  return value.length > max ? `${value.slice(0, max)}...` : value;
+}
+
+function scrubTelemetryText(value: string): string {
+  const home = process.env.HOME || '';
+  const escapedHome = home.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  let scrubbed = value
+    .replace(/sk-or-[A-Za-z0-9_-]+/g, '[redacted-openrouter-key]')
+    .replace(/sk-[A-Za-z0-9_-]+/g, '[redacted-openai-key]')
+    .replace(/data:image\/[^;\s]+;base64,[A-Za-z0-9+/=_-]+/g, '[redacted-image]');
+  if (home) scrubbed = scrubbed.replace(new RegExp(escapedHome, 'g'), '[home]');
+  return truncate(scrubbed.replace(/\/Users\/[^/\s)]+/g, '/Users/[user]'));
+}
+
+function scrubProperties(properties: Record<string, unknown>): Record<string, unknown> {
+  const clean: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(properties)) {
+    if (
+      typeof value === 'string' ||
+      typeof value === 'number' ||
+      typeof value === 'boolean' ||
+      value == null
+    ) {
+      clean[key] = typeof value === 'string' ? scrubTelemetryText(value) : value;
+    } else {
+      clean[key] = '[redacted]';
+    }
+  }
+  return clean;
+}
+
+function errorSummary(err: Error): string {
+  const message = scrubTelemetryText(err.message || '');
+  const providerStatus = message.match(/\b(OpenAI|OpenRouter) API error (\d{3})\b/);
+  if (providerStatus) return `${providerStatus[1]} API error ${providerStatus[2]}`;
+  const codexExit = message.match(/\bCodex failed \(exit \d+\)/);
+  if (codexExit) return codexExit[0];
+  const geminiExit = message.match(/\bGemini failed \(exit \d+\)/);
+  if (geminiExit) return geminiExit[0];
+  if (message.startsWith('Could not run Codex')) return 'Could not run Codex';
+  if (message.startsWith('Could not run Gemini')) return 'Could not run Gemini';
+  if (message.startsWith('Codex timed out')) return 'Codex timed out';
+  if (message.startsWith('Gemini timed out')) return 'Gemini timed out';
+  return err.name || 'Error';
+}
+
 /** Stable-but-anonymous per-install id, generated once and stored in prefs. */
 function anonId(): string {
   let id = prefs.getString(ANON_ID_KEY).trim();
@@ -72,7 +119,7 @@ export function capture(event: string, properties: Record<string, unknown> = {})
     event,
     distinct_id: anonId(),
     properties: {
-      ...properties,
+      ...scrubProperties(properties),
       app_version: appVersion(),
       os: process.platform,
       $lib: 'nib-app',
@@ -109,7 +156,10 @@ function framesFromStack(stack: string) {
     .slice(1, 30)
     .map((line) => line.trim())
     .filter(Boolean)
-    .map((line) => ({ filename: line, function: line }))
+    .map((line) => {
+      const scrubbed = scrubTelemetryText(line);
+      return { filename: scrubbed, function: scrubbed };
+    })
     .reverse();
 }
 
@@ -132,13 +182,13 @@ export function captureError(err: unknown, context: Record<string, unknown> = {}
     release: `nib@${appVersion()}`,
     environment: process.env.ICON_PROVIDER === 'mock' ? 'development' : 'production',
     tags: { os: process.platform },
-    extra: context,
+    extra: scrubProperties(context),
     user: { id: anonId() },
     exception: {
       values: [
         {
           type: e.name || 'Error',
-          value: e.message || String(err),
+          value: errorSummary(e),
           stacktrace: e.stack ? { frames: framesFromStack(e.stack) } : undefined,
         },
       ],

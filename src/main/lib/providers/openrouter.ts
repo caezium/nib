@@ -3,8 +3,8 @@ import type {
   GenerationRequest,
   GenerationResult,
 } from "../image-provider";
-import { withRetry } from "../image-provider";
-import { getResolvedApiKey } from "../openai-api-key";
+import { withRetry, TerminalError } from "../image-provider";
+import { getResolvedOpenRouterApiKey } from "../openai-api-key";
 import { getOpenRouterModel } from "../app-settings";
 
 // ---------------------------------------------------------------------------
@@ -17,11 +17,21 @@ const CHAT_COMPLETIONS_URL = "https://openrouter.ai/api/v1/chat/completions";
 const REFERER = "https://github.com/caezium/nib";
 const TITLE = "Nib";
 
-/** Abort individual HTTP requests after this many milliseconds. */
-const REQUEST_TIMEOUT_MS = 90_000;
+/** Abort individual HTTP requests after this many milliseconds. Image models
+ *  vary wildly in speed (gemini-flash ~10s, some gpt-image lanes >90s). */
+const REQUEST_TIMEOUT_MS = 150_000;
 
 /** How many times to retry a failed request before giving up. */
 const MAX_RETRIES = 3;
+
+const IMAGE_ONLY_MODELS = new Set([
+  "black-forest-labs/flux.2-pro",
+  "black-forest-labs/flux.2-flex",
+  "black-forest-labs/flux.2-klein-4b",
+  "black-forest-labs/flux.2-max",
+  "bytedance-seed/seedream-4.5",
+  "x-ai/grok-imagine-image-quality",
+]);
 
 // ---------------------------------------------------------------------------
 // Response shape (only the fields we read)
@@ -89,10 +99,10 @@ function extractImageB64(json: ChatCompletionResponse): string | null {
  */
 export class OpenRouterProvider implements ImageProvider {
   async generate(request: GenerationRequest): Promise<GenerationResult> {
-    const apiKey = getResolvedApiKey();
+    const apiKey = getResolvedOpenRouterApiKey();
     if (!apiKey) {
       throw new Error(
-        "No OpenRouter API key. Use the startup dialog or save a key in app preferences."
+        "No OpenRouter API key. Save an sk-or key in Settings, or switch to Auto/Codex."
       );
     }
 
@@ -168,7 +178,7 @@ export class OpenRouterProvider implements ImageProvider {
           },
           body: JSON.stringify({
             model,
-            modalities: ["image", "text"],
+            modalities: IMAGE_ONLY_MODELS.has(model) ? ["image"] : ["image", "text"],
             // Article illustrations are 16:9 landscape.
             image_config: { aspect_ratio: "16:9" },
             messages: [{ role: "user", content }],
@@ -177,7 +187,20 @@ export class OpenRouterProvider implements ImageProvider {
 
         if (!res.ok) {
           const body = await res.text();
-          throw new Error(`OpenRouter API error ${res.status}: ${body}`);
+          if (res.status === 402) {
+            // Out of credits — retrying won't help, fail fast.
+            throw new TerminalError(
+              "OpenRouter is out of credits for this request. Add credits at " +
+                "https://openrouter.ai/settings/credits, or switch to a cheaper model in Settings."
+            );
+          }
+          if (res.status === 401 || res.status === 403) {
+            // Bad/rejected key — retrying won't help, fail fast.
+            throw new TerminalError(
+              `OpenRouter rejected the API key (${res.status}). Check your sk-or key in Settings.`
+            );
+          }
+          throw new Error(`OpenRouter API error ${res.status}: ${body.slice(0, 300)}`);
         }
 
         const json = (await res.json()) as ChatCompletionResponse;
@@ -188,6 +211,16 @@ export class OpenRouterProvider implements ImageProvider {
           );
         }
         return image;
+      } catch (err) {
+        // The AbortController fires on timeout; surface it as something useful
+        // instead of the raw DOMException "This operation was aborted".
+        if (err instanceof Error && (err.name === "AbortError" || /aborted/i.test(err.message))) {
+          throw new Error(
+            `The image request timed out after ${REQUEST_TIMEOUT_MS / 1000}s — the model may be slow ` +
+              "or busy. Try again, or switch to a faster model (e.g. google/gemini-2.5-flash-image) in Settings."
+          );
+        }
+        throw err;
       } finally {
         clearTimeout(timeoutId);
       }
