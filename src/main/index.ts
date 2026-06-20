@@ -47,6 +47,7 @@ import { AppServiceDescriptor } from './gen/ipc_service';
 import { buildPrompt } from './lib/prompt-builder';
 import { styleList } from './lib/styles';
 import { resolveProvider } from './lib/provider-resolver';
+import { GenerationError } from './lib/image-provider';
 import {
   getResolvedApiKey,
   hasApiKeyInPrefs,
@@ -61,17 +62,9 @@ import {
   setAvatarSpec,
 } from './lib/avatar-store';
 import {
-  getBackendSetting,
-  setBackendSetting,
-  getFreeBackendPreference,
-  setFreeBackendPreference,
-  getOpenRouterModel,
-  setOpenRouterModel,
-  getTextModel,
-  setTextModel,
-  codexAvailable,
-  getCodexStatus,
-  geminiAvailable,
+  loadImageSettings,
+  saveImageSettings,
+  imageDerivedFacts,
   SUGGESTED_MODELS,
   SUGGESTED_TEXT_MODELS,
 } from './lib/app-settings';
@@ -415,9 +408,10 @@ ipc.registerService(AppServiceDescriptor, {
         requested: count,
         duration_ms: Date.now() - startedAt,
       });
-      return { images: result.images, error: '' };
+      return { images: result.images, error: '', errorReason: '' };
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
+      const errorReason = err instanceof GenerationError ? err.reason : 'unknown';
       capture('generation', {
         status: 'error',
         style: request.style,
@@ -425,7 +419,7 @@ ipc.registerService(AppServiceDescriptor, {
         duration_ms: Date.now() - startedAt,
       });
       captureError(err, { scope: 'generate' });
-      return { images: [], error: message };
+      return { images: [], error: message, errorReason };
     }
   },
 
@@ -548,30 +542,35 @@ ipc.registerService(AppServiceDescriptor, {
   async GetImageSettings(
     _request: GetImageSettingsRequest
   ): Promise<GetImageSettingsResponse> {
+    // Persisted choices and derived/probed facts come from two distinct calls,
+    // making the persisted-vs-derived split explicit at the boundary.
+    const chosen = loadImageSettings();
+    const facts = imageDerivedFacts();
     return {
-      backend: getBackendSetting(),
-      model: getOpenRouterModel(),
-      textModel: getTextModel(),
-      codexAvailable: codexAvailable(),
-      codexStatus: getCodexStatus(),
-      geminiAvailable: geminiAvailable(),
-      hasKey: hasApiKeyInPrefs(),
+      backend: chosen.backend,
+      model: chosen.openRouterModel,
+      textModel: chosen.textModel,
+      freeBackendPreference: chosen.freeBackendPreference,
+      codexAvailable: facts.codexAvailable,
+      codexStatus: facts.codexStatus,
+      geminiAvailable: facts.geminiAvailable,
+      hasKey: facts.hasKey,
       suggestedModels: SUGGESTED_MODELS,
       suggestedTextModels: SUGGESTED_TEXT_MODELS,
-      freeBackendPreference: getFreeBackendPreference(),
     };
   },
 
   async SetImageSettings(request: SetImageSettingsRequest) {
-    if (request.backend) setBackendSetting(request.backend);
-    setOpenRouterModel(request.model);
-    // Persist unconditionally (like the image model above): an empty string
-    // clears the override so getTextModel() falls back to the default, and the
-    // saved value never diverges from what the Settings UI shows.
-    setTextModel(request.textModel ?? "");
-    if (request.freeBackendPreference) {
-      setFreeBackendPreference(request.freeBackendPreference);
-    }
+    // Whole-object write — derived facts have no setter, so the modal can't
+    // pretend to write them, and an empty model/textModel clears the override
+    // instead of being silently skipped.
+    saveImageSettings({
+      backend: request.backend || 'auto',
+      openRouterModel: request.model ?? '',
+      textModel: request.textModel ?? '',
+      freeBackendPreference:
+        request.freeBackendPreference === 'gemini' ? 'gemini' : 'codex',
+    });
     return {};
   },
 

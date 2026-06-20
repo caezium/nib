@@ -3,7 +3,7 @@ import type {
   GenerationRequest,
   GenerationResult,
 } from "../image-provider";
-import { withRetry } from "../image-provider";
+import { withRetry, GenerationError } from "../image-provider";
 import { getResolvedOpenAIApiKey } from "../openai-api-key";
 
 // ---------------------------------------------------------------------------
@@ -56,7 +56,8 @@ export class OpenAIProvider implements ImageProvider {
   async generate(request: GenerationRequest): Promise<GenerationResult> {
     const apiKey = getResolvedOpenAIApiKey();
     if (!apiKey) {
-      throw new Error(
+      throw new GenerationError(
+        "no_key",
         "No OpenAI API key. Save an OpenAI sk key in Settings, or switch to Auto/Codex."
       );
     }

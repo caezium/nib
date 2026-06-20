@@ -3,7 +3,7 @@ import type {
   GenerationRequest,
   GenerationResult,
 } from "../image-provider";
-import { withRetry, TerminalError } from "../image-provider";
+import { withRetry, GenerationError } from "../image-provider";
 import { getResolvedOpenRouterApiKey } from "../openai-api-key";
 import { getOpenRouterModel } from "../app-settings";
 
@@ -101,7 +101,8 @@ export class OpenRouterProvider implements ImageProvider {
   async generate(request: GenerationRequest): Promise<GenerationResult> {
     const apiKey = getResolvedOpenRouterApiKey();
     if (!apiKey) {
-      throw new Error(
+      throw new GenerationError(
+        "no_key",
         "No OpenRouter API key. Save an sk-or key in Settings, or switch to Auto/Codex."
       );
     }
@@ -189,24 +190,31 @@ export class OpenRouterProvider implements ImageProvider {
           const body = await res.text();
           if (res.status === 402) {
             // Out of credits — retrying won't help, fail fast.
-            throw new TerminalError(
+            throw new GenerationError(
+              "no_credits",
               "OpenRouter is out of credits for this request. Add credits at " +
                 "https://openrouter.ai/settings/credits, or switch to a cheaper model in Settings."
             );
           }
           if (res.status === 401 || res.status === 403) {
             // Bad/rejected key — retrying won't help, fail fast.
-            throw new TerminalError(
+            throw new GenerationError(
+              "no_key",
               `OpenRouter rejected the API key (${res.status}). Check your sk-or key in Settings.`
             );
           }
-          throw new Error(`OpenRouter API error ${res.status}: ${body.slice(0, 300)}`);
+          throw new GenerationError(
+            "unknown",
+            `OpenRouter API error ${res.status}: ${body.slice(0, 300)}`,
+            /* retryable */ true
+          );
         }
 
         const json = (await res.json()) as ChatCompletionResponse;
         const image = extractImageB64(json);
         if (!image) {
-          throw new Error(
+          throw new GenerationError(
+            "unsupported_model",
             "OpenRouter returned no image. Ensure the selected model supports image output."
           );
         }
@@ -215,9 +223,11 @@ export class OpenRouterProvider implements ImageProvider {
         // The AbortController fires on timeout; surface it as something useful
         // instead of the raw DOMException "This operation was aborted".
         if (err instanceof Error && (err.name === "AbortError" || /aborted/i.test(err.message))) {
-          throw new Error(
+          throw new GenerationError(
+            "timeout",
             `The image request timed out after ${REQUEST_TIMEOUT_MS / 1000}s — the model may be slow ` +
-              "or busy. Try again, or switch to a faster model (e.g. google/gemini-2.5-flash-image) in Settings."
+              "or busy. Try again, or switch to a faster model (e.g. google/gemini-2.5-flash-image) in Settings.",
+            /* retryable */ true
           );
         }
         throw err;
