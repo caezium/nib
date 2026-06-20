@@ -89,6 +89,14 @@
   .inst .k { font-weight: 700; font-size: 14px; margin-bottom: 8px; }
   .inst code { display: block; background: #f4f1ec; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; font-family: ui-monospace, Menlo, monospace; font-size: 13px; overflow-x: auto; white-space: pre; }
 
+  /* App screenshots */
+  .shots { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin-top: 24px; }
+  @media (max-width: 760px) { .shots { grid-template-columns: 1fr; } }
+  .shot { background: var(--card); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+  .shot img { display: block; width: 100%; height: auto; border-bottom: 1px solid var(--line); }
+  .shot .cap { padding: 10px 14px; font-size: 13px; color: var(--muted); }
+  .shot .cap b { color: var(--ink); font-weight: 600; }
+
   /* Try a prompt */
   .prompts { display: grid; gap: 10px; margin-top: 24px; }
   .prompt { text-align: left; width: 100%; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 13px 16px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 14px; font-family: inherit; transition: border-color .15s; }
@@ -110,6 +118,7 @@
       <div class="nav-links">
         <a href="#looks">Looks</a>
         <a href="#how">How it works</a>
+        <a href="#app">App</a>
         <a href="#install">Install</a>
         <a href="https://github.com/caezium/nib">GitHub</a>
       </div>
@@ -158,6 +167,22 @@
       <span class="chip">Marker</span><span class="chip">Riso</span><span class="chip">Blueprint</span>
       <span class="chip">Woodcut</span><span class="chip">Pixel</span><span class="chip">Clay</span><span class="chip">Gouache</span>
     </div>
+  </section>
+
+  <section id="app">
+    <h2>Prefer a desktop app?</h2>
+    <p class="lead">Same engine, a native macOS app — onboard a character, pick a look, and turn one idea or a whole article into a consistent set. Free on a Codex / ChatGPT plan, or bring an OpenRouter key.</p>
+    <div class="shots">
+      <div class="shot"><img src="shots/concept.png" alt="Concept mode — a control rail and a plate gallery" loading="lazy"><div class="cap"><b>Concept</b> — one idea, one plate, in any look</div></div>
+      <div class="shot"><img src="shots/article.png" alt="Article mode — paste a URL and Nib pulls the load-bearing ideas" loading="lazy"><div class="cap"><b>Article</b> — paste a URL, get a shot list of the ideas that matter</div></div>
+      <div class="shot"><img src="shots/avatar.png" alt="Avatar setup — start from a built-in character or bring your own" loading="lazy"><div class="cap"><b>Your character</b> — start from Hen, Mo or Sumi, or bring your own</div></div>
+      <div class="shot"><img src="shots/settings.png" alt="Settings — free Codex/Gemini lanes or a keyed OpenRouter model" loading="lazy"><div class="cap"><b>Settings</b> — free Codex / Gemini lanes, or pick an OpenRouter model</div></div>
+    </div>
+    <div class="cta" style="margin-top:24px">
+      <button class="cmd" data-copy="brew install --cask caezium/tap/nib">brew install --cask caezium/tap/nib <span class="copy">copy</span></button>
+      <a class="ghost" href="https://github.com/caezium/nib/releases">Download .dmg</a>
+    </div>
+    <div class="note">macOS (Apple Silicon) · self-signed pre-1.0 build.</div>
   </section>
 
   <section id="cost">

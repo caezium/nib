@@ -102,6 +102,17 @@ Flags: `--backend auto|openrouter|codex` · `--model <id>` · `--avatar-pack <na
 A TypeScript + React desktop app (macOS) — avatar onboarding, a style picker, generation
 history, and a zoomable lightbox.
 
+<p align="center">
+  <img src="site/shots/concept.png" width="49%" alt="Concept mode — the studio: a control rail and a plate gallery" />
+  <img src="site/shots/article.png" width="49%" alt="Article mode — paste a URL, Nib pulls the load-bearing ideas into a shot list" />
+</p>
+<p align="center">
+  <img src="site/shots/avatar.png" width="49%" alt="Avatar setup — start from Hen, Mo, or Sumi, or bring your own character" />
+  <img src="site/shots/settings.png" width="49%" alt="Settings — free Codex/Gemini lanes or a keyed OpenRouter model, plus a shot-list model picker" />
+</p>
+
+*Concept and Article modes · pick a starter character · free and keyed generation lanes.*
+
 **Install (macOS, Apple Silicon):**
 
 ```sh
