@@ -9,6 +9,10 @@ out/
 # Generated code.
 gen/
 
+# Python bytecode cache (skill engine + tests).
+__pycache__/
+*.pyc
+
 # macOS metadata.
 .DS_Store
 
