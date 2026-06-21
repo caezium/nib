@@ -85,6 +85,16 @@ import {
 
 const GITHUB_REPOSITORY_URL = 'https://github.com/caezium/nib';
 
+/**
+ * Expected, user-actionable failures (no API key, CLI not installed, model
+ * declined, request timed out) are already surfaced in the UI — they are not
+ * crashes, so they must not pollute Sentry. Only unexpected errors (a plain
+ * Error, or a GenerationError tagged `unknown`) are worth a crash report.
+ */
+function isExpectedFailure(err: unknown): boolean {
+  return err instanceof GenerationError && err.reason !== 'unknown';
+}
+
 async function showAboutDialog() {
   const result = await app.showMessageDialog({
     parentWindow: win,
@@ -418,7 +428,7 @@ ipc.registerService(AppServiceDescriptor, {
         provider,
         duration_ms: Date.now() - startedAt,
       });
-      captureError(err, { scope: 'generate' });
+      if (!isExpectedFailure(err)) captureError(err, { scope: 'generate' });
       return { images: [], error: message, errorReason };
     }
   },
@@ -483,7 +493,7 @@ ipc.registerService(AppServiceDescriptor, {
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       capture('shotlist', { status: 'error' });
-      captureError(err, { scope: 'shotlist' });
+      if (!isExpectedFailure(err)) captureError(err, { scope: 'shotlist' });
       return { shots: [], error: message };
     }
   },

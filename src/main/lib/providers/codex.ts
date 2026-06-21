@@ -124,7 +124,7 @@ function runCodex(args: string[], promptStdin: string): Promise<string> {
     let err = "";
     const timer = setTimeout(() => {
       child.kill("SIGKILL");
-      reject(new Error("Codex timed out generating the image."));
+      reject(new GenerationError("timeout", "Codex timed out generating the image.", true));
     }, CODEX_TIMEOUT_MS);
 
     child.stdout.on("data", (d) => (out += d.toString()));
@@ -132,7 +132,8 @@ function runCodex(args: string[], promptStdin: string): Promise<string> {
     child.on("error", (e) => {
       clearTimeout(timer);
       reject(
-        new Error(
+        new GenerationError(
+          "cli_missing",
           `Could not run Codex (${e.message}). Install it and run \`codex login\`, or switch to OpenRouter in Settings.`
         )
       );
@@ -141,7 +142,8 @@ function runCodex(args: string[], promptStdin: string): Promise<string> {
       clearTimeout(timer);
       if (code !== 0) {
         reject(
-          new Error(
+          new GenerationError(
+            "declined",
             `Codex failed (exit ${code}). Run \`codex login\`, or switch to OpenRouter. ${err.slice(0, 300)}`
           )
         );
