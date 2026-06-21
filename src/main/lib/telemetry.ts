@@ -46,6 +46,20 @@ function appVersion(): string {
   }
 }
 
+/**
+ * 'production' only for a packaged build. A `mobrowser dev` run (and mock) is
+ * 'development', so HMR/Fast-Refresh transients and other dev-only noise never
+ * land in the production Sentry view alongside real user errors.
+ */
+function environmentName(): string {
+  try {
+    if (process.env.ICON_PROVIDER === 'mock') return 'development';
+    return app.packaged ? 'production' : 'development';
+  } catch {
+    return 'development';
+  }
+}
+
 function truncate(value: string, max = 240): string {
   return value.length > max ? `${value.slice(0, max)}...` : value;
 }
@@ -180,7 +194,7 @@ export function captureError(err: unknown, context: Record<string, unknown> = {}
     platform: 'node',
     level: 'error',
     release: `nib@${appVersion()}`,
-    environment: process.env.ICON_PROVIDER === 'mock' ? 'development' : 'production',
+    environment: environmentName(),
     tags: { os: process.platform },
     extra: scrubProperties(context),
     user: { id: anonId() },

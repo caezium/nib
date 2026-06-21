@@ -126,7 +126,7 @@ function runGemini(workdir: string, prompt: string): Promise<void> {
     let err = "";
     const timer = setTimeout(() => {
       child.kill("SIGKILL");
-      reject(new Error("Gemini timed out generating the image."));
+      reject(new GenerationError("timeout", "Gemini timed out generating the image.", true));
     }, GEMINI_TIMEOUT_MS);
 
     child.stdout.on("data", () => {});
@@ -134,7 +134,8 @@ function runGemini(workdir: string, prompt: string): Promise<void> {
     child.on("error", (e) => {
       clearTimeout(timer);
       reject(
-        new Error(
+        new GenerationError(
+          "cli_missing",
           `Could not run Gemini (${e.message}). Install it and run \`gemini\` to sign in, or use Codex/OpenRouter.`
         )
       );
@@ -143,7 +144,8 @@ function runGemini(workdir: string, prompt: string): Promise<void> {
       clearTimeout(timer);
       if (code !== 0) {
         reject(
-          new Error(
+          new GenerationError(
+            "declined",
             `Gemini failed (exit ${code}). Run \`gemini\` to sign in, configure image generation, or use Codex/OpenRouter. ${err.slice(0, 300)}`
           )
         );

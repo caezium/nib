@@ -1,5 +1,5 @@
 import { getResolvedApiKey } from "./openai-api-key";
-import { withRetry, type ProviderName } from "./image-provider";
+import { withRetry, GenerationError, type ProviderName } from "./image-provider";
 import { getCodexCliPath, getGeminiCliPath, getTextModel } from "./app-settings";
 import { spawn } from "node:child_process";
 import * as fs from "node:fs";
@@ -74,7 +74,8 @@ function runCodexShotList(article: string): Promise<Shot[]> {
     const codex = getCodexCliPath();
     if (!codex) {
       reject(
-        new Error(
+        new GenerationError(
+          "cli_missing",
           "Could not find the Codex CLI. Install it and run `codex login`, or switch to OpenRouter in Settings."
         )
       );
@@ -93,7 +94,7 @@ function runCodexShotList(article: string): Promise<Shot[]> {
     const timer = setTimeout(() => {
       child.kill("SIGKILL");
       cleanup();
-      reject(new Error("Codex timed out planning the article."));
+      reject(new GenerationError("timeout", "Codex timed out planning the article.", true));
     }, CODEX_TEXT_TIMEOUT_MS);
 
     child.stdout.on("data", (d) => (out += d.toString()));
@@ -102,7 +103,8 @@ function runCodexShotList(article: string): Promise<Shot[]> {
       clearTimeout(timer);
       cleanup();
       reject(
-        new Error(
+        new GenerationError(
+          "cli_missing",
           `Could not run Codex (${e.message}). Install it and run \`codex login\`, or switch to OpenRouter in Settings.`
         )
       );
@@ -112,7 +114,8 @@ function runCodexShotList(article: string): Promise<Shot[]> {
       cleanup();
       if (code !== 0) {
         reject(
-          new Error(
+          new GenerationError(
+            "declined",
             `Codex failed planning the article (exit ${code}). Run \`codex login\`, or switch to OpenRouter. ${err.slice(0, 300)}`
           )
         );
@@ -120,7 +123,8 @@ function runCodexShotList(article: string): Promise<Shot[]> {
       }
       try {
         const shots = parseShots(out);
-        if (shots.length === 0) throw new Error("Codex returned no usable shots.");
+        if (shots.length === 0)
+          throw new GenerationError("declined", "Codex returned no usable shots.");
         resolve(shots);
       } catch (e) {
         reject(e);
@@ -137,7 +141,8 @@ function runGeminiShotList(article: string): Promise<Shot[]> {
     const gemini = getGeminiCliPath();
     if (!gemini) {
       reject(
-        new Error(
+        new GenerationError(
+          "cli_missing",
           "Could not find the Gemini CLI. Install it and run `gemini` to sign in, or switch to OpenRouter in Settings."
         )
       );
@@ -164,7 +169,7 @@ function runGeminiShotList(article: string): Promise<Shot[]> {
     const timer = setTimeout(() => {
       child.kill("SIGKILL");
       cleanup();
-      reject(new Error("Gemini timed out planning the article."));
+      reject(new GenerationError("timeout", "Gemini timed out planning the article.", true));
     }, GEMINI_TEXT_TIMEOUT_MS);
 
     child.stdout.on("data", (d) => (out += d.toString()));
@@ -173,7 +178,8 @@ function runGeminiShotList(article: string): Promise<Shot[]> {
       clearTimeout(timer);
       cleanup();
       reject(
-        new Error(
+        new GenerationError(
+          "cli_missing",
           `Could not run Gemini (${e.message}). Install it and run \`gemini\` to sign in, or switch to OpenRouter in Settings.`
         )
       );
@@ -183,7 +189,8 @@ function runGeminiShotList(article: string): Promise<Shot[]> {
       cleanup();
       if (code !== 0) {
         reject(
-          new Error(
+          new GenerationError(
+            "declined",
             `Gemini failed planning the article (exit ${code}). Run \`gemini\` to sign in, or switch to OpenRouter. ${err.slice(0, 300)}`
           )
         );
@@ -191,7 +198,8 @@ function runGeminiShotList(article: string): Promise<Shot[]> {
       }
       try {
         const shots = parseShots(out);
-        if (shots.length === 0) throw new Error("Gemini returned no usable shots.");
+        if (shots.length === 0)
+          throw new GenerationError("declined", "Gemini returned no usable shots.");
         resolve(shots);
       } catch (e) {
         reject(e);
@@ -256,7 +264,10 @@ export async function planShotList(
 
   const apiKey = getResolvedApiKey();
   if (!apiKey) {
-    throw new Error("No API key. Add an OpenAI or OpenRouter key in app preferences.");
+    throw new GenerationError(
+      "no_key",
+      "No API key. Add an OpenAI or OpenRouter key in app preferences."
+    );
   }
   const cfg = chatConfig(provider, apiKey);
 
@@ -280,6 +291,18 @@ export async function planShotList(
       });
       if (!res.ok) {
         const body = await res.text();
+        if (res.status === 401 || res.status === 403) {
+          throw new GenerationError(
+            "no_key",
+            `Shot-list API rejected the key (${res.status}). Check your key in Settings.`
+          );
+        }
+        if (res.status === 402) {
+          throw new GenerationError(
+            "no_credits",
+            "Shot-list API is out of credits. Add credits, or switch models in Settings."
+          );
+        }
         throw new Error(`Shot-list API error ${res.status}: ${body}`);
       }
       const json = (await res.json()) as {
@@ -287,7 +310,8 @@ export async function planShotList(
       };
       const content = json.choices?.[0]?.message?.content ?? "";
       const shots = parseShots(content);
-      if (shots.length === 0) throw new Error("The model returned no usable shots.");
+      if (shots.length === 0)
+        throw new GenerationError("declined", "The model returned no usable shots.");
       return shots;
     } finally {
       clearTimeout(timeoutId);
