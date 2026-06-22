@@ -10,6 +10,8 @@ type ShotResult = {
   image: string | null
   /** True once this image has been exported to a file the user chose. */
   saved?: boolean
+  /** The failure reason from the engine, shown on the card when status is error. */
+  error?: string
 }
 
 /** Build the per-shot generation prompt from its idea + suggested labels. */
@@ -129,7 +131,11 @@ export function ArticlePanel({
           referenceMime: "",
         })
         if (res.error || res.images.length === 0) {
-          setResult(i, { status: "error", image: null })
+          setResult(i, {
+            status: "error",
+            image: null,
+            error: res.error || "No image was produced.",
+          })
         } else {
           setResult(i, {
             status: "done",
@@ -137,8 +143,12 @@ export function ArticlePanel({
             saved: false,
           })
         }
-      } catch {
-        setResult(i, { status: "error", image: null })
+      } catch (e) {
+        setResult(i, {
+          status: "error",
+          image: null,
+          error: e instanceof Error ? e.message : "Generation failed.",
+        })
       }
     },
     [shots, setResult, style, avatarReady, onNeedAvatar]
@@ -188,7 +198,9 @@ export function ArticlePanel({
   }, [])
 
   // Report unsaved generated images up so the app's quit guard covers an
-  // article batch; clear it when this panel unmounts (mode switch).
+  // article batch. The panel now stays mounted across mode switches (its state
+  // must survive a trip to Concept), so this flag only clears when the work is
+  // saved or the article is reset — and finally on app teardown.
   const hasUnsaved = results.some((r) => r.image && !r.saved)
   useEffect(() => {
     onDirtyChange(hasUnsaved)
@@ -288,7 +300,12 @@ export function ArticlePanel({
                     {shot.coreIdea}
                   </span>
                   {r.status === "error" && (
-                    <span className="mt-1 text-[11px] text-destructive">Generation failed.</span>
+                    <span
+                      className="mt-1 line-clamp-2 text-[11px] text-destructive"
+                      title={r.error || "Generation failed."}
+                    >
+                      {r.error || "Generation failed."}
+                    </span>
                   )}
                   <div className="mt-2 flex items-center gap-1.5 pt-0.5">
                     <button

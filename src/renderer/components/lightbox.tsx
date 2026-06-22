@@ -29,7 +29,7 @@ export function Lightbox({ src, onClose }: { src: string | null; onClose: () => 
 
   return (
     <div
-      className="fixed inset-0 z-[110] overflow-auto bg-black/85 backdrop-blur-sm"
+      className="non-draggable fixed inset-0 z-[110] overflow-auto bg-black/85 backdrop-blur-sm"
       onClick={onClose}
     >
       <button
