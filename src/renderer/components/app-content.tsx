@@ -49,6 +49,9 @@ export function AppContent() {
   const [prompt, setPrompt] = useState("")
   const [attachments, setAttachments] = useState<string[]>([])
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  // Structured failure class (GenerateIconResponse.error_reason) when available;
+  // preferred over message string-matching to decide the "Update API key" action.
+  const [errorReason, setErrorReason] = useState<string>("")
   const [saveSuccess, setSaveSuccess] = useState<{ folderPath: string; imagePath: string } | null>(
     null
   )
@@ -247,9 +250,10 @@ export function AppContent() {
     } else if (pipeline.status === "error") {
       pendingMetaRef.current = null
       const raw = pipeline.progress.label
+      setErrorReason(pipeline.errorReason || "")
       setErrorMessage(raw.startsWith("Error: ") ? raw.slice(7) : raw)
     }
-  }, [pipeline.status, pipeline.variants, pipeline.progress.label, clearAttachments])
+  }, [pipeline.status, pipeline.variants, pipeline.progress.label, pipeline.errorReason, clearAttachments])
 
   // Quit guard: any unsaved plate (gallery or article) is unsaved work.
   useEffect(() => {
@@ -370,6 +374,14 @@ export function AppContent() {
     }
   }, [])
 
+  // Clear the whole gallery — also wipes the persisted history on disk.
+  const clearGallery = useCallback(async () => {
+    await ipc.app.ClearHistory({}).catch(() => {})
+    setGallery([])
+    setSavedIds(new Set())
+    setSelectedPlateId(null)
+  }, [])
+
   const removeAttachment = (index: number) =>
     setAttachments((prev) => prev.filter((_, i) => i !== index))
 
@@ -383,7 +395,10 @@ export function AppContent() {
           message={errorMessage}
           onClose={() => setErrorMessage(null)}
           onUpdateApiKey={
-            generationErrorSuggestsApiKeyIssue(errorMessage)
+            // Prefer the structured reason; fall back to the message heuristic
+            // for errors that predate the taxonomy (or IPC-layer failures).
+            errorReason === "no_key" ||
+            (!errorReason && generationErrorSuggestsApiKeyIssue(errorMessage))
               ? () => {
                   setErrorMessage(null)
                   setOpenAIApiKeyManageReason("authError")
@@ -524,7 +539,11 @@ export function AppContent() {
           />
         )}
 
-        {mode === "concept" ? (
+        {/* Both surfaces stay mounted; the inactive one is display:none, not
+            unmounted. Switching modes therefore never discards the other's
+            state — a drafted shot list, generated article images, or an
+            in-flight batch all survive a trip to Concept and back. */}
+        <div className={cn("flex flex-1 min-h-0 flex-col", mode !== "concept" && "hidden")}>
           <Gallery
             plates={gallery}
             generating={isGenerating}
@@ -533,22 +552,22 @@ export function AppContent() {
             onOpenHistory={openHistory}
             onZoom={setLightbox}
             onSave={savePlate}
+            onClear={clearGallery}
             savedIds={savedIds}
             mockMode={mockMode}
             examples={EXAMPLE_PROMPTS}
             onPickExample={setPrompt}
           />
-        ) : (
-          <div className="flex-1 min-h-0 pt-14">
-            <ArticlePanel
-              style={selectedStyle}
-              onZoom={setLightbox}
-              avatarReady={avatarReady}
-              onNeedAvatar={() => setAvatarModal("setup")}
-              onDirtyChange={setArticleDirty}
-            />
-          </div>
-        )}
+        </div>
+        <div className={cn("flex-1 min-h-0 pt-14", mode !== "article" && "hidden")}>
+          <ArticlePanel
+            style={selectedStyle}
+            onZoom={setLightbox}
+            avatarReady={avatarReady}
+            onNeedAvatar={() => setAvatarModal("setup")}
+            onDirtyChange={setArticleDirty}
+          />
+        </div>
       </main>
     </div>
   )
@@ -841,6 +860,7 @@ function Gallery({
   onOpenHistory,
   onZoom,
   onSave,
+  onClear,
   savedIds,
   mockMode,
   examples,
@@ -853,11 +873,13 @@ function Gallery({
   onOpenHistory: (plate: Plate) => void
   onZoom: (src: string) => void
   onSave: (plate: Plate) => void
+  onClear: () => void
   savedIds: Set<string>
   mockMode: boolean
   examples: string[]
   onPickExample: (text: string) => void
 }) {
+  const [confirmClear, setConfirmClear] = useState(false)
   const empty = plates.length === 0 && !generating
 
   return (
@@ -876,6 +898,38 @@ function Gallery({
             </span>
           )}
         </div>
+
+        {plates.length > 0 &&
+          (confirmClear ? (
+            <div className="flex items-center gap-1 text-xs">
+              <span className="text-muted-foreground">Clear all?</span>
+              <button
+                type="button"
+                onClick={() => {
+                  setConfirmClear(false)
+                  onClear()
+                }}
+                className="h-7 rounded-md px-2 font-medium text-destructive transition-colors hover:bg-destructive/10"
+              >
+                Yes
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmClear(false)}
+                className="h-7 rounded-md px-2 text-muted-foreground transition-colors hover:bg-foreground/5"
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setConfirmClear(true)}
+              className="h-7 rounded-md px-2 text-xs text-muted-foreground transition-[transform,color,background-color] hover:bg-foreground/5 hover:text-foreground active:scale-[0.97]"
+            >
+              Clear
+            </button>
+          ))}
       </div>
 
       {empty ? (

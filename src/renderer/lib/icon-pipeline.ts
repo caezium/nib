@@ -21,6 +21,12 @@ export interface IconPipeline {
   status: PipelineStatus
   progress: PipelineProgress
   /**
+   * Machine-readable failure class from the last error (GenerateIconResponse
+   * error_reason): no_key | no_credits | cli_missing | timeout |
+   * unsupported_model | declined | unknown. Empty unless status === "error".
+   */
+  errorReason: string
+  /**
    * Up to 3 generated 16:9 PNG data-URLs, shown in the preview and saved exactly
    * as generated. (The icon app kept a separate unmasked copy for .icns export;
    * illustrations need no masking, so there is a single array now.)
@@ -58,6 +64,7 @@ export function useIconPipeline(): IconPipeline {
   const [status, setStatus] = useState<PipelineStatus>("idle")
   const [progress, setProgress] = useState<PipelineProgress>({ fraction: 0, label: "" })
   const [variants, setVariants] = useState<(string | null)[]>([null, null, null])
+  const [errorReason, setErrorReason] = useState("")
 
   // Set when the user clicks Stop while a request is in flight.
   const cancelledRef = useRef(false)
@@ -71,6 +78,7 @@ export function useIconPipeline(): IconPipeline {
     setVariants([null, null, null])
     setStatus("generating")
     setProgress({ fraction: 0, label: "" })
+    setErrorReason("")
 
     try {
       // Convert an optional per-generation reference (blob/data URL) to raw
@@ -110,6 +118,7 @@ export function useIconPipeline(): IconPipeline {
 
       if (response.error) {
         setStatus("error")
+        setErrorReason(response.errorReason || "")
         setProgress({ fraction: 0, label: `Error: ${response.error}` })
         return
       }
@@ -143,5 +152,5 @@ export function useIconPipeline(): IconPipeline {
     setProgress({ fraction: 1, label: "" })
   }, [])
 
-  return { status, progress, variants, generate, cancel, loadVariants }
+  return { status, progress, variants, errorReason, generate, cancel, loadVariants }
 }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import {
   Check,
   ChevronDown,
@@ -13,19 +13,31 @@ import {
 } from "lucide-react"
 import { ipc } from "@/gen/ipc"
 import { cn } from "@/lib/utils"
+import {
+  type ImageSettings,
+  type ApiKeyKind,
+  keyKind,
+  useTelemetryOptOut,
+  useImageSettings,
+  useApiKey,
+} from "./settings-modal.hooks"
 
-type ImageSettings = {
-  backend: string
-  model: string
-  codexAvailable: boolean
-  geminiAvailable: boolean
-  freeBackendPreference: FreeBackendPreference
-  hasKey: boolean
-  suggestedModels: string[]
+/** Accurate Codex hint — distinguishes "not installed" from "installed but
+ *  logged out" from "installed but too old for image artifacts (needs 0.141+)". */
+function codexHint(img: ImageSettings | null): string {
+  switch (img?.codexStatus) {
+    case "ok":
+      return "Signed-in app subscription"
+    case "logged-out":
+      return "Found — run `codex login`"
+    case "needs-update":
+      return "Found — update Codex (needs 0.141+)"
+    case "no-cli":
+      return "Codex CLI not found"
+    default:
+      return img?.codexAvailable ? "Signed-in app subscription" : "Codex CLI not found"
+  }
 }
-
-type ApiKeyKind = "openrouter" | "openai" | "empty"
-type FreeBackendPreference = "codex" | "gemini"
 
 type ModelDetails = {
   name: string
@@ -76,12 +88,15 @@ const MODEL_DETAILS: Record<string, ModelDetails> = {
     name: "Grok Imagine",
     note: "xAI image quality",
   },
-}
-
-function keyKind(value: string): ApiKeyKind {
-  const trimmed = value.trim()
-  if (!trimmed) return "empty"
-  return trimmed.startsWith("sk-or-") ? "openrouter" : "openai"
+  // Text models (shot-list / article planning).
+  "openai/gpt-5.4-mini": { name: "GPT-5.4 Mini", note: "OpenAI · fast & cheap · ~$0.75/M" },
+  "openai/gpt-5.4-nano": { name: "GPT-5.4 Nano", note: "OpenAI · cheapest · ~$0.20/M" },
+  "google/gemini-3.1-flash-lite": { name: "Gemini 3.1 Flash Lite", note: "Google · cheap · ~$0.25/M" },
+  "google/gemini-3.5-flash": { name: "Gemini 3.5 Flash", note: "Google · capable · ~$1.50/M" },
+  "deepseek/deepseek-v4-flash": { name: "DeepSeek V4 Flash", note: "DeepSeek · ultra-cheap · ~$0.09/M" },
+  "qwen/qwen3.6-flash": { name: "Qwen3.6 Flash", note: "Qwen · cheap · ~$0.19/M" },
+  "x-ai/grok-4.3": { name: "Grok 4.3", note: "xAI · ~$1.25/M" },
+  "anthropic/claude-opus-4.8": { name: "Claude Opus 4.8", note: "Anthropic · top quality · ~$5/M" },
 }
 
 function keyKindLabel(kind: ApiKeyKind): string {
@@ -96,10 +111,6 @@ function modelDetails(id: string): ModelDetails {
 
 function openExternal(url: string) {
   ipc.app.OpenExternalUrl({ url }).catch(() => {})
-}
-
-function normalizeFreeBackendPreference(value: string | undefined): FreeBackendPreference {
-  return value === "gemini" ? "gemini" : "codex"
 }
 
 function routeSummary(img: ImageSettings | null, apiKeyDraft: string): string {
@@ -141,137 +152,33 @@ function keyModelSummary(img: ImageSettings | null, apiKeyDraft: string): string
  * Settings: the image-generation backend + model, API key, and telemetry opt-out.
  */
 export function SettingsModal({ onClose }: { onClose: () => void }) {
-  const [optOut, setOptOut] = useState<boolean | null>(null)
-  const [img, setImg] = useState<ImageSettings | null>(null)
-  const [apiKey, setApiKey] = useState("")
-  const [apiKeyDraft, setApiKeyDraft] = useState("")
-  const [keyBusy, setKeyBusy] = useState(false)
-  const [keyError, setKeyError] = useState<string | null>(null)
-  const [keySaved, setKeySaved] = useState(false)
-  const [keyVisible, setKeyVisible] = useState(false)
+  const telemetry = useTelemetryOptOut()
+  const image = useImageSettings()
+  const key = useApiKey(image.setHasKey)
 
-  useEffect(() => {
-    ipc.app
-      .GetTelemetryOptOut({})
-      .then((r) => {
-        const resp = r as unknown as { optOut?: boolean; opt_out?: boolean }
-        setOptOut(resp.optOut ?? resp.opt_out ?? false)
-      })
-      .catch(() => setOptOut(false))
+  // Aliases so the JSX below reads unchanged.
+  const img = image.img
+  const saveImg = image.save
+  const optOut = telemetry.optOut
+  const telemetryOn = telemetry.on
+  const toggleTelemetry = telemetry.toggle
+  const apiKey = key.apiKey
+  const apiKeyDraft = key.draft
+  const kind = key.kind
+  const canSaveKey = key.canSave
+  const keyBusy = key.busy
+  const keyError = key.error
+  const keySaved = key.saved
+  const keyVisible = key.visible
+  const saveKey = key.save
+  const clearKey = key.clear
 
-    ipc.app
-      .GetImageSettings({})
-      .then((r) => {
-        const resp = r as unknown as {
-          backend?: string
-          model?: string
-          codexAvailable?: boolean
-          codex_available?: boolean
-          geminiAvailable?: boolean
-          gemini_available?: boolean
-          freeBackendPreference?: string
-          free_backend_preference?: string
-          hasKey?: boolean
-          has_key?: boolean
-          suggestedModels?: string[]
-          suggested_models?: string[]
-        }
-        setImg({
-          backend: resp.backend || "auto",
-          model: resp.model || "",
-          codexAvailable: resp.codexAvailable ?? resp.codex_available ?? false,
-          geminiAvailable: resp.geminiAvailable ?? resp.gemini_available ?? false,
-          freeBackendPreference: normalizeFreeBackendPreference(
-            resp.freeBackendPreference ?? resp.free_backend_preference
-          ),
-          hasKey: resp.hasKey ?? resp.has_key ?? false,
-          suggestedModels: resp.suggestedModels ?? resp.suggested_models ?? [],
-        })
-      })
-      .catch(() => {})
-
-    ipc.app
-      .GetStoredOpenAIApiKey({})
-      .then((r) => {
-        const saved = r.apiKey ?? ""
-        setApiKey(saved)
-        setApiKeyDraft(saved)
-      })
-      .catch(() => {})
-  }, [])
-
-  const telemetryOn = optOut === false
-  const kind = keyKind(apiKeyDraft)
-  const keyDirty = apiKeyDraft.trim() !== apiKey
-  const canSaveKey = keyDirty && !keyBusy
   const routeWarning =
     img?.backend === "openrouter" && kind !== "openrouter"
       ? "OpenRouter needs an sk-or key."
       : img?.backend === "openai" && kind !== "openai"
         ? "OpenAI API needs an OpenAI key."
         : null
-
-  const toggleTelemetry = () => {
-    if (optOut === null) return
-    const next = !optOut
-    setOptOut(next)
-    ipc.app.SetTelemetryOptOut({ optOut: next }).catch(() => {})
-  }
-
-  const saveImg = (next: ImageSettings) => {
-    setImg(next)
-    ipc.app
-      .SetImageSettings({
-        backend: next.backend,
-        model: next.model,
-        freeBackendPreference: next.freeBackendPreference,
-      })
-      .catch(() => {})
-  }
-
-  const saveKey = async () => {
-    if (!canSaveKey) return
-    setKeyBusy(true)
-    setKeyError(null)
-    setKeySaved(false)
-    const trimmed = apiKeyDraft.trim()
-    try {
-      const res = await ipc.app.SetOpenAIApiKey({ apiKey: trimmed })
-      if (res.error) {
-        setKeyError(res.error)
-      } else {
-        setApiKey(trimmed)
-        setApiKeyDraft(trimmed)
-        setImg((cur) => (cur ? { ...cur, hasKey: trimmed.length > 0 } : cur))
-        setKeySaved(true)
-      }
-    } catch {
-      setKeyError("Could not save the API key.")
-    } finally {
-      setKeyBusy(false)
-    }
-  }
-
-  const clearKey = async () => {
-    setApiKeyDraft("")
-    setKeyBusy(true)
-    setKeyError(null)
-    setKeySaved(false)
-    try {
-      const res = await ipc.app.SetOpenAIApiKey({ apiKey: "" })
-      if (res.error) {
-        setKeyError(res.error)
-      } else {
-        setApiKey("")
-        setImg((cur) => (cur ? { ...cur, hasKey: false } : cur))
-        setKeySaved(true)
-      }
-    } catch {
-      setKeyError("Could not clear the API key.")
-    } finally {
-      setKeyBusy(false)
-    }
-  }
 
   const backends = [
     {
@@ -286,7 +193,7 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
     {
       id: "codex",
       label: "Codex",
-      hint: img?.codexAvailable ? "Signed-in app subscription" : "Codex app not found",
+      hint: codexHint(img),
       disabled: img != null && !img.codexAvailable,
     },
     {
@@ -306,7 +213,7 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm"
+      className="non-draggable fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
       aria-labelledby="settings-title"
@@ -417,6 +324,21 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
                 onChange={(model) => saveImg({ ...img, model })}
               />
             )}
+
+            {showOpenRouterModel && img && (
+              <>
+                <ModelPicker
+                  label="Shot-list model · drafts an article's ideas"
+                  placeholder="openai/gpt-5.4-mini"
+                  value={img.textModel}
+                  suggestions={img.suggestedTextModels}
+                  onChange={(textModel) => saveImg({ ...img, textModel })}
+                />
+                <p className="mt-1 text-[11px] text-muted-foreground/70">
+                  A cheap text model is plenty. On Codex/Gemini lanes the CLI plans the article instead.
+                </p>
+              </>
+            )}
           </div>
 
           <div className="rounded-xl border border-border bg-secondary/30 p-3.5">
@@ -430,11 +352,7 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
                 <input
                   type={keyVisible ? "text" : "password"}
                   value={apiKeyDraft}
-                  onChange={(e) => {
-                    setApiKeyDraft(e.target.value)
-                    setKeySaved(false)
-                    setKeyError(null)
-                  }}
+                  onChange={(e) => key.setDraft(e.target.value)}
                   autoComplete="off"
                   spellCheck={false}
                   placeholder="sk-... or sk-or-..."
@@ -442,7 +360,7 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
                 />
                 <button
                   type="button"
-                  onClick={() => setKeyVisible((v) => !v)}
+                  onClick={() => key.toggleVisible()}
                   className="absolute right-1 top-1 flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-[background-color,color] hover:bg-foreground/5 hover:text-foreground active:scale-[0.96]"
                   aria-label={keyVisible ? "Hide API key" : "Show API key"}
                 >
@@ -525,7 +443,7 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
                 disabled={optOut === null}
                 onClick={toggleTelemetry}
                 className={cn(
-                  "relative h-6 w-10 shrink-0 rounded-full transition-colors duration-200",
+                  "flex h-6 w-10 shrink-0 items-center rounded-full px-0.5 transition-colors duration-200",
                   optOut === null
                     ? "cursor-wait bg-muted"
                     : telemetryOn
@@ -535,8 +453,8 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
               >
                 <span
                   className={cn(
-                    "absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform duration-200",
-                    telemetryOn ? "translate-x-[18px]" : "translate-x-0.5"
+                    "h-5 w-5 rounded-full bg-white shadow-sm transition-transform duration-200",
+                    telemetryOn ? "translate-x-4" : "translate-x-0"
                   )}
                 />
               </button>
@@ -556,10 +474,14 @@ function ModelPicker({
   value,
   suggestions,
   onChange,
+  label = "OpenRouter model",
+  placeholder = "google/gemini-2.5-flash-image",
 }: {
   value: string
   suggestions: string[]
   onChange: (model: string) => void
+  label?: string
+  placeholder?: string
 }) {
   const [open, setOpen] = useState(false)
   const selected = modelDetails(value)
@@ -568,7 +490,7 @@ function ModelPicker({
   return (
     <div className="mt-3">
       <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
-        OpenRouter model
+        {label}
       </label>
       <div
         className="relative"
@@ -602,7 +524,7 @@ function ModelPicker({
         {open && (
           <div
             role="listbox"
-            aria-label="OpenRouter model suggestions"
+            aria-label={`${label} suggestions`}
             className="absolute left-0 right-0 top-full z-30 mt-1 max-h-64 overflow-y-auto rounded-lg bg-card p-1 shadow-[0_0_0_1px_rgba(28,26,23,0.08),0_12px_32px_-12px_rgba(28,26,23,0.3)]"
           >
             {options.map((model) => {
@@ -641,7 +563,7 @@ function ModelPicker({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         spellCheck={false}
-        placeholder="google/gemini-3.1-flash-image-preview"
+        placeholder={placeholder}
         className="mt-1.5 h-8 w-full rounded-lg border border-border bg-background/70 px-3 font-mono text-xs text-foreground outline-none transition-[border-color,box-shadow] placeholder:text-muted-foreground focus:border-foreground/40 focus:ring-2 focus:ring-foreground/[0.06]"
       />
     </div>
