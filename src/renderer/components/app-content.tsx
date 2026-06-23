@@ -45,6 +45,16 @@ interface Plate {
   count?: number
 }
 
+/**
+ * Cap on the in-memory session gallery. Each full-res variant is a multi-MB
+ * base64 string PLUS a decoded bitmap in the DOM, and the array was previously
+ * never trimmed — a long session could climb to several GB. Plates beyond this
+ * are dropped from the grid (oldest first); they remain in the on-disk history
+ * store and reload as thumbnails, so nothing is lost. Newest plates (the user's
+ * current work, prepended) are always kept.
+ */
+const MAX_GALLERY_PLATES = 60
+
 export function AppContent() {
   const [prompt, setPrompt] = useState("")
   const [attachments, setAttachments] = useState<string[]>([])
@@ -172,7 +182,7 @@ export function AppContent() {
         setGallery((g) => {
           const have = new Set(g.map((p) => p.id))
           const add = hist.filter((p) => !have.has(p.id))
-          return add.length ? [...g, ...add] : g
+          return add.length ? [...g, ...add].slice(0, MAX_GALLERY_PLATES) : g
         })
         setSavedIds((prev) => {
           const next = new Set(prev)
@@ -242,7 +252,7 @@ export function AppContent() {
           look: meta.look,
         }))
       if (fresh.length === 0) return
-      setGallery((g) => [...fresh, ...g])
+      setGallery((g) => [...fresh, ...g].slice(0, MAX_GALLERY_PLATES))
       // Don't auto-select: leave Generate as "Generate" so the next idea starts
       // fresh. Selecting a plate is an explicit choice to refine from it.
       setSelectedPlateId(null)
@@ -362,7 +372,7 @@ export function AppContent() {
         idea: plate.idea,
         look: plate.look,
       }))
-      setGallery((g) => [...fresh, ...g.filter((p) => p.id !== plate.id)])
+      setGallery((g) => [...fresh, ...g.filter((p) => p.id !== plate.id)].slice(0, MAX_GALLERY_PLATES))
       setSavedIds((prev) => {
         const next = new Set(prev)
         for (const p of fresh) next.add(p.id)
