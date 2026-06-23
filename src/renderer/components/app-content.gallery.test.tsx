@@ -57,6 +57,38 @@ describe("useGallery", () => {
     expect(result.current.plates.filter((p) => p.id === "h-1").length).toBe(1)
   })
 
+  it("appendVariants keeps full-res src and swaps in a downscaled thumbnail", async () => {
+    class FakeImage {
+      onload: (() => void) | null = null
+      onerror: (() => void) | null = null
+      naturalWidth = 1536
+      naturalHeight = 1024
+      set src(_v: string) {
+        setTimeout(() => this.onload?.(), 0)
+      }
+    }
+    vi.stubGlobal("Image", FakeImage)
+    const proto = HTMLCanvasElement.prototype as unknown as {
+      getContext: unknown
+      toDataURL: unknown
+    }
+    const origGetContext = proto.getContext
+    const origToDataURL = proto.toDataURL
+    proto.getContext = () => ({ drawImage: () => {} })
+    proto.toDataURL = () => "data:image/jpeg;base64,THUMB"
+
+    const { result } = renderHook(() => useGallery())
+    await waitFor(() => expect(app.GetHistory).toHaveBeenCalled())
+    act(() => result.current.appendVariants(["FULLRES"], { idea: "x", look: "marker" }))
+    await waitFor(() => expect(result.current.plates[0].thumbSrc).toBe("data:image/jpeg;base64,THUMB"))
+    // Full-res is preserved for the lightbox / refine reference.
+    expect(result.current.plates[0].src).toBe("FULLRES")
+
+    proto.getContext = origGetContext
+    proto.toDataURL = origToDataURL
+    vi.unstubAllGlobals()
+  })
+
   it("save() records the plate as saved and reports the path", async () => {
     vi.stubGlobal(
       "fetch",
