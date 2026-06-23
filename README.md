@@ -17,6 +17,14 @@ reference on every generation, it stays on-model across an entire piece.
 
 *Same character, three looks — and it didn't drift.*
 
+<p>
+  <img src="site/concepts/momentum.jpg" width="32%" alt="building momentum — pushing a snowball uphill" />
+  <img src="site/concepts/debugging.jpg" width="32%" alt="debugging — pulling one thread from a tangled ball of yarn" />
+  <img src="site/concepts/focus.jpg" width="32%" alt="deep focus — working inside a glowing bubble while the world fades" />
+</p>
+
+*…and the same character illustrating actual ideas — momentum, debugging, deep focus.*
+
 **[nib.henryzh.dev](https://nib.henryzh.dev)** · Free & open source · MIT
 
 </div>
