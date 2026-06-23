@@ -48,10 +48,11 @@ Use nib: set my avatar to ./avatar.png, then illustrate "saying no protects focu
   (`codex login`), Nib generates on your existing subscription. No API key, no per-image
   charge.
 - **OpenRouter — a few cents an image.** Set `OPENROUTER_API_KEY` and Nib uses
-  `google/gemini-2.5-flash-image` (or any image model via `--model`). Exact 16:9. A whole
-  blog post for under a dollar.
+  `google/gemini-3.1-flash-image-preview` (or any image model via `--model`). Exact 16:9. A
+  whole blog post for under a dollar.
 
-It picks automatically: your OpenRouter key if set, else the free Codex lane.
+It picks automatically: your OpenRouter key if set, else a free **Codex** or **Gemini CLI**
+lane (whichever you're signed into).
 
 ## Bring a character — or grab one
 
@@ -78,13 +79,14 @@ one-paragraph spec + a reference image). Or bring your own avatar image, and opt
 4. **Generate**, reviewing each against the quality bar (white background, one idea, the
    character performing the action, short labels only).
 
-The methodology and the seven looks live in one place — `skills/nib/references/` — read by
+The methodology and the looks live in one place — `skills/nib/references/` — read by
 **both** the skill engine and the desktop app, so they never drift.
 
-## The seven looks
+## The thirteen looks
 
-`marker` · `riso` · `blueprint` · `woodcut` · `pixel` · `clay` · `gouache` — one per piece,
-so a set reads as a series. See [`references/styles.md`](skills/nib/references/styles.md).
+`marker` · `riso` · `blueprint` · `woodcut` · `pixel` · `clay` · `gouache` · `chalk` ·
+`diorama` · `enamel` · `felt` · `manila` · `phosphor` — one per piece, so a set reads as a
+series. See [`references/styles.md`](skills/nib/references/styles.md).
 
 ## The engine
 
@@ -99,12 +101,14 @@ Flags: `--backend auto|openrouter|codex` · `--model <id>` · `--avatar-pack <na
 
 ## The desktop app
 
-A TypeScript + React desktop app (macOS) — avatar onboarding, a style picker, generation
-history, and a zoomable lightbox.
+A TypeScript + React desktop app (macOS) — avatar onboarding, a style picker, a generation
+history grid, and a zoomable lightbox. **Concept mode** draws one idea at a time; **Article
+mode** turns a post — or your own draft — into a shot list you *shape*: pick which moments
+to draw, add your own, ask for more, then generate them in parallel.
 
 <p align="center">
   <img src="site/shots/concept.png" width="49%" alt="Concept mode — the studio: a control rail and a plate gallery" />
-  <img src="site/shots/article.png" width="49%" alt="Article mode — paste a URL, Nib pulls the load-bearing ideas into a shot list" />
+  <img src="site/shots/article.png" width="49%" alt="Article mode — a shot list you shape: select, add, or expand the ideas, then draw them in parallel" />
 </p>
 <p align="center">
   <img src="site/shots/avatar.png" width="49%" alt="Avatar setup — start from Hen, Mo, or Sumi, or bring your own character" />
