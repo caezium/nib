@@ -1,9 +1,8 @@
 import type {
-  ImageProvider,
   GenerationRequest,
-  GenerationResult,
+  NormalizedReference,
 } from "../image-provider";
-import { withRetry, GenerationError } from "../image-provider";
+import { BaseImageProvider, withRetry, GenerationError } from "../image-provider";
 import { getResolvedOpenRouterApiKey } from "../openai-api-key";
 import { getOpenRouterModel } from "../app-settings";
 
@@ -97,8 +96,13 @@ function extractImageB64(json: ChatCompletionResponse): string | null {
  *
  * API key: read from application preferences only (an `sk-or-…` key).
  */
-export class OpenRouterProvider implements ImageProvider {
-  async generate(request: GenerationRequest): Promise<GenerationResult> {
+export class OpenRouterProvider extends BaseImageProvider {
+  /** Generate a single image via one chat-completion request. The base class
+   *  fans out `count` of these and surfaces the first failure. */
+  protected generateOne(
+    request: GenerationRequest,
+    ref: NormalizedReference | undefined
+  ): Promise<string> {
     const apiKey = getResolvedOpenRouterApiKey();
     if (!apiKey) {
       throw new GenerationError(
@@ -106,52 +110,7 @@ export class OpenRouterProvider implements ImageProvider {
         "No OpenRouter API key. Save an sk-or key in Settings, or switch to Auto/Codex."
       );
     }
-
     const model = getOpenRouterModel();
-    const count = Math.max(1, request.count);
-
-    // One image per request → fire `count` requests concurrently.
-    const settled = await Promise.allSettled(
-      Array.from({ length: count }, () =>
-        this.generateOne(
-          apiKey,
-          model,
-          request.positivePrompt,
-          request.referenceImageB64,
-          request.referenceImageMime
-        )
-      )
-    );
-
-    const images = settled
-      .filter(
-        (r): r is PromiseFulfilledResult<string> => r.status === "fulfilled"
-      )
-      .map((r) => r.value);
-
-    if (images.length === 0) {
-      // Surface the first failure (preserves 401/403 so the UI can re-prompt
-      // for the key).
-      const firstRejection = settled.find((r) => r.status === "rejected") as
-        | PromiseRejectedResult
-        | undefined;
-      const reason = firstRejection?.reason;
-      throw reason instanceof Error
-        ? reason
-        : new Error(String(reason ?? "OpenRouter returned no image data."));
-    }
-
-    return { images };
-  }
-
-  /** Generate a single image via one chat-completion request. */
-  private generateOne(
-    apiKey: string,
-    model: string,
-    prompt: string,
-    referenceB64?: string,
-    referenceMime?: string
-  ): Promise<string> {
     return withRetry(async () => {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
@@ -159,14 +118,13 @@ export class OpenRouterProvider implements ImageProvider {
       try {
         // For an edit, the reference image precedes the text instruction.
         const content: ChatImagePart[] | Array<Record<string, unknown>> = [];
-        if (referenceB64) {
-          const mime = referenceMime?.trim() || "image/png";
+        if (ref) {
           content.push({
             type: "image_url",
-            image_url: { url: `data:${mime};base64,${referenceB64}` },
+            image_url: { url: `data:${ref.mime};base64,${ref.b64}` },
           });
         }
-        content.push({ type: "text", text: prompt });
+        content.push({ type: "text", text: request.positivePrompt });
 
         const res = await fetch(CHAT_COMPLETIONS_URL, {
           method: "POST",

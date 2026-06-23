@@ -1,9 +1,8 @@
 import type {
-  ImageProvider,
   GenerationRequest,
-  GenerationResult,
+  NormalizedReference,
 } from "../image-provider";
-import { GenerationError } from "../image-provider";
+import { BaseImageProvider, GenerationError } from "../image-provider";
 import { spawn } from "node:child_process";
 import * as fs from "node:fs";
 import * as os from "node:os";
@@ -22,43 +21,17 @@ import { getCodexCliPath } from "../app-settings";
 const GEN_ROOT = path.join(os.homedir(), ".codex", "generated_images");
 const CODEX_TIMEOUT_MS = 480_000;
 
-export class CodexProvider implements ImageProvider {
-  async generate(request: GenerationRequest): Promise<GenerationResult> {
-    const count = Math.max(1, request.count);
-    const settled = await Promise.allSettled(
-      Array.from({ length: count }, () => this.generateOne(request))
-    );
-    const images = settled
-      .filter((r): r is PromiseFulfilledResult<string> => r.status === "fulfilled")
-      .map((r) => r.value);
-
-    if (images.length === 0) {
-      const rejection = settled.find((r) => r.status === "rejected") as
-        | PromiseRejectedResult
-        | undefined;
-      const reason = rejection?.reason;
-      throw reason instanceof Error
-        ? reason
-        : new Error(String(reason ?? "Codex returned no image."));
-    }
-    return { images };
-  }
-
-  private async generateOne(request: GenerationRequest): Promise<string> {
+export class CodexProvider extends BaseImageProvider {
+  protected async generateOne(
+    request: GenerationRequest,
+    ref: NormalizedReference | undefined
+  ): Promise<string> {
     const workdir = fs.mkdtempSync(path.join(os.tmpdir(), "nib-codex-"));
     try {
       let avatarPath: string | undefined;
-      if (request.referenceImageB64) {
-        const mime = request.referenceImageMime || "image/png";
-        const ext = mime.includes("jpeg")
-          ? "jpg"
-          : mime.includes("webp")
-            ? "webp"
-            : mime.includes("gif")
-              ? "gif"
-              : "png";
-        avatarPath = path.join(workdir, `avatar.${ext}`);
-        fs.writeFileSync(avatarPath, Buffer.from(request.referenceImageB64, "base64"));
+      if (ref) {
+        avatarPath = path.join(workdir, `avatar.${ref.ext}`);
+        fs.writeFileSync(avatarPath, Buffer.from(ref.b64, "base64"));
       }
 
       const instruction =
