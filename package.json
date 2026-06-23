@@ -19,6 +19,8 @@
     "dev:mock": "ICON_PROVIDER=mock mobrowser dev",
     "build": "mobrowser build",
     "gen": "mobrowser gen",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "mobrowser": "mobrowser"
   },
   "dependencies": {
@@ -41,6 +43,8 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.2",
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/react": "^16.3.2",
     "@types/node": "^20.11.5",
     "@types/react": "^19.1.2",
     "@types/react-dom": "^19.1.2",
@@ -51,11 +55,13 @@
     "eslint": "^9.18.0",
     "eslint-plugin-react-hooks": "^5.1.0",
     "eslint-plugin-react-refresh": "^0.4.5",
+    "jsdom": "^25.0.1",
     "postcss": "^8.4.33",
     "tailwindcss": "^4.1.4",
     "ts-proto": "^2.10.1",
     "typescript": "^5.8.3",
-    "vite": "^8.0.0"
+    "vite": "^8.0.0",
+    "vitest": "^3.2.6"
   },
   "engines": {
     "node": "^20.20.2 || ^22.22.2 || >=24.14.1"
