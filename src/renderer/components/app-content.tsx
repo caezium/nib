@@ -18,7 +18,6 @@ import { Lightbox } from "@/components/lightbox"
 import {
   OpenAIApiKeyManageModal,
   OpenAIApiKeyStartupModal,
-  type OpenAIApiKeyManageReason,
 } from "@/components/openai-api-key-modals"
 import { ErrorModal, generationErrorSuggestsApiKeyIssue } from "@/components/error-modal"
 import { SaveSuccessModal } from "@/components/save-success-modal"
@@ -27,6 +26,12 @@ import { ArticlePanel } from "@/components/article-panel"
 import { TitleBarStatus } from "@/components/title-bar-status"
 import type { StyleOption } from "@/components/style-picker"
 import { useIconPipeline } from "@/lib/icon-pipeline"
+import {
+  useAvatar,
+  useStyles,
+  useAppMode,
+  useApiKeyGate,
+} from "@/components/app-content.hooks"
 import { EXAMPLE_PROMPTS } from "@/lib/examples"
 import { ipc } from "@/gen/ipc"
 import { cn } from "@/lib/utils"
@@ -65,30 +70,37 @@ export function AppContent() {
   const [saveSuccess, setSaveSuccess] = useState<{ folderPath: string; imagePath: string } | null>(
     null
   )
-  const [openAIApiKeyStartupOpen, setOpenAIApiKeyStartupOpen] = useState(false)
-  const [openAIApiKeyManageReason, setOpenAIApiKeyManageReason] =
-    useState<OpenAIApiKeyManageReason | null>(null)
-  // Avatar gate: the persistent reference character. Blocking on first run.
-  const [avatarReady, setAvatarReady] = useState(false)
-  const [avatarModal, setAvatarModal] = useState<"setup" | "settings" | null>(null)
-  const [avatarSrc, setAvatarSrc] = useState<string | null>(null)
-  // True when the mock provider is active (placeholder images, no API calls).
-  const [mockMode, setMockMode] = useState(false)
   const [aboutOpen, setAboutOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   // Full-screen image viewer (null = closed).
   const [lightbox, setLightbox] = useState<string | null>(null)
-  // Single-concept vs whole-article batch mode.
-  const [mode, setMode] = useState<"concept" | "article">("concept")
-  // Look library + current selection.
-  const [styles, setStyles] = useState<StyleOption[]>([])
-  const [selectedStyle, setSelectedStyle] = useState("")
   // The session gallery: every generated plate, newest first.
   const [gallery, setGallery] = useState<Plate[]>([])
   const [selectedPlateId, setSelectedPlateId] = useState<string | null>(null)
   const [savedIds, setSavedIds] = useState<Set<string>>(() => new Set())
   // Unsaved illustrations also live in Article mode (a separate component).
   const [articleDirty, setArticleDirty] = useState(false)
+
+  // Deep hooks (RFC #4): each owns a cohesive slice of state + its IPC + mount
+  // effect. Aliased back to the original names so the view below is unchanged.
+  const avatar = useAvatar()
+  const avatarReady = avatar.ready
+  const avatarSrc = avatar.src
+  const avatarModal = avatar.modal
+  const setAvatarModal = avatar.setModal
+  const refreshAvatar = avatar.refresh
+  const styleLib = useStyles()
+  const styles = styleLib.styles
+  const selectedStyle = styleLib.selected
+  const setSelectedStyle = styleLib.setSelected
+  const selectedStyleLabel = styleLib.label
+  const { mode, setMode } = useAppMode()
+  const apiKeyGate = useApiKeyGate()
+  const mockMode = apiKeyGate.mockMode
+  const openAIApiKeyStartupOpen = apiKeyGate.startupOpen
+  const setOpenAIApiKeyStartupOpen = apiKeyGate.setStartupOpen
+  const openAIApiKeyManageReason = apiKeyGate.manageReason
+  const setOpenAIApiKeyManageReason = apiKeyGate.setManageReason
 
   const pipeline = useIconPipeline()
   const prevPipelineStatusRef = useRef(pipeline.status)
@@ -97,63 +109,11 @@ export function AppContent() {
   // null when the next "done" came from loading history rather than generating.
   const pendingMetaRef = useRef<{ idea: string; look: string } | null>(null)
 
-  const selectedStyleLabel =
-    styles.find((s) => s.id === selectedStyle)?.label ?? selectedStyle
   const selectedPlate = gallery.find((p) => p.id === selectedPlateId) ?? null
   const isGenerating = pipeline.status === "generating"
   const galleryDirty = gallery.some((p) => !savedIds.has(p.id))
 
-  const refreshAvatar = useCallback((gateOnFirstRun = false) => {
-    ipc.app
-      .GetAvatar({})
-      .then((r) => {
-        setAvatarReady(r.hasAvatar)
-        if (r.hasAvatar && r.imageB64) {
-          setAvatarSrc(`data:${r.mime || "image/png"};base64,${r.imageB64}`)
-        } else {
-          setAvatarSrc(null)
-        }
-        if (gateOnFirstRun && !r.hasAvatar) setAvatarModal("setup")
-      })
-      .catch(() => {})
-  }, [])
-
   useEffect(() => {
-    ipc.app
-      .GetOpenAIApiKeyStatus({})
-      .then((s) => {
-        const resp = s as unknown as {
-          openaiKeyRequired?: boolean
-          openai_key_required?: boolean
-          hasOpenaiKey?: boolean
-          has_openai_key?: boolean
-          isMock?: boolean
-          is_mock?: boolean
-        }
-        const required = resp.openaiKeyRequired ?? resp.openai_key_required
-        const hasKey = resp.hasOpenaiKey ?? resp.has_openai_key
-        const isMock = resp.isMock ?? resp.is_mock ?? false
-        // Only the mock provider shows the placeholder badge — Codex (free sub)
-        // also needs no key but is real generation.
-        setMockMode(isMock)
-        if (required === true && hasKey !== true) {
-          setOpenAIApiKeyStartupOpen(true)
-        }
-      })
-      .catch(() => {})
-
-    // Avatar gate: open the blocking setup modal on first run.
-    refreshAvatar(true)
-
-    // Look library.
-    ipc.app
-      .GetStyles({})
-      .then((r) => {
-        setStyles(r.styles)
-        if (r.styles.length > 0) setSelectedStyle((cur) => cur || r.styles[0].id)
-      })
-      .catch(() => {})
-
     // Past generations → the gallery grid (the grid IS the history now).
     ipc.app
       .GetHistory({})
