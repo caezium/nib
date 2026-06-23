@@ -780,7 +780,7 @@ function Gallery({
                     className="block w-full overflow-hidden rounded-lg bg-white ring-1 ring-border shadow-[0_1px_2px_-1px_rgba(28,26,23,0.05),0_5px_14px_-10px_rgba(28,26,23,0.14)] transition-[box-shadow,transform] duration-200 hover:ring-foreground/30 hover:shadow-[0_2px_5px_-2px_rgba(28,26,23,0.08),0_14px_28px_-12px_rgba(28,26,23,0.22)] active:scale-[0.97] focus:outline-none focus-visible:ring-2 focus-visible:ring-foreground/30"
                   >
                     <div className="relative flex aspect-[16/9] items-center justify-center">
-                      <img src={p.src} alt={p.idea} className="h-full w-full object-contain" draggable={false} />
+                      <img src={p.thumbSrc ?? p.src} alt={p.idea} className="h-full w-full object-contain" draggable={false} />
                     </div>
                   </button>
                   {p.count != null && p.count > 1 && (
@@ -816,7 +816,7 @@ function Gallery({
                   )}
                 >
                   <div className="relative aspect-[16/9] flex items-center justify-center">
-                    <img src={p.src} alt={p.idea} className="h-full w-full object-contain" draggable={false} />
+                    <img src={p.thumbSrc ?? p.src} alt={p.idea} className="h-full w-full object-contain" draggable={false} />
                   </div>
                 </button>
 

@@ -8,13 +8,55 @@ import type { OpenAIApiKeyManageReason } from "@/components/openai-api-key-modal
  *  generation (thumbnail); clicking it expands its full variants. */
 export interface Plate {
   id: string
+  /** Full-resolution image (used for the lightbox + as a refine reference). */
   src: string
+  /**
+   * Small grid thumbnail. The grid renders this so off-screen tiles decode a
+   * tiny bitmap instead of the multi-MB full-res image; full-res `src` stays a
+   * string in memory (not decoded) until the lightbox opens it. Undefined for
+   * collapsed history tiles, whose `src` is already a small thumbnail.
+   */
+  thumbSrc?: string
   idea: string
   look: string
   /** Set when this tile is a persisted past generation loaded from history. */
   historyId?: string
   /** Number of variants in that past generation (for the ×N badge). */
   count?: number
+}
+
+/**
+ * Downscale a full-res data URL to a small JPEG thumbnail for the grid. Falls
+ * back to the original URL if the image/canvas API is unavailable (e.g. jsdom)
+ * or the draw fails — callers treat "thumb === src" as "no downscale".
+ */
+function makeThumbnail(dataUrl: string, maxWidth = 360): Promise<string> {
+  return new Promise((resolve) => {
+    try {
+      const img = new Image()
+      img.onload = () => {
+        const natural = img.naturalWidth || maxWidth
+        const scale = Math.min(1, maxWidth / natural)
+        const w = Math.max(1, Math.round(natural * scale))
+        const h = Math.max(1, Math.round((img.naturalHeight || natural) * scale))
+        const canvas = document.createElement("canvas")
+        canvas.width = w
+        canvas.height = h
+        const ctx = canvas.getContext("2d")
+        if (!ctx) return resolve(dataUrl)
+        try {
+          ctx.drawImage(img, 0, 0, w, h)
+          resolve(canvas.toDataURL("image/jpeg", 0.82))
+        } catch {
+          resolve(dataUrl)
+        }
+      }
+      img.onerror = () => resolve(dataUrl)
+      img.src = dataUrl
+    } catch {
+      resolve(dataUrl)
+    }
+  })
 }
 
 /**
@@ -187,6 +229,19 @@ export function useGallery() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Generate a grid thumbnail for each new plate and swap it in when ready, so
+  // the grid stops holding a decoded full-res bitmap for every tile.
+  const attachThumbnails = useCallback((fresh: Plate[]) => {
+    for (const plate of fresh) {
+      makeThumbnail(plate.src)
+        .then((thumbSrc) => {
+          if (thumbSrc === plate.src) return // no downscale happened (fallback)
+          setPlates((g) => g.map((x) => (x.id === plate.id ? { ...x, thumbSrc } : x)))
+        })
+        .catch(() => {})
+    }
+  }, [])
+
   /** Append freshly-generated variants as new plates (newest first, capped). */
   const appendVariants = useCallback(
     (variants: string[], meta: { idea: string; look: string }) => {
@@ -200,8 +255,9 @@ export function useGallery() {
       setPlates((g) => [...fresh, ...g].slice(0, MAX_GALLERY_PLATES))
       // Don't auto-select: leave Generate as "Generate" for the next idea.
       setSelectedId(null)
+      attachThumbnails(fresh)
     },
-    []
+    [attachThumbnails]
   )
 
   /** Expand a collapsed history tile into its full-res variants. */
@@ -225,10 +281,11 @@ export function useGallery() {
         return next
       })
       setSelectedId(null)
+      attachThumbnails(fresh)
     } catch {
       /* ignore */
     }
-  }, [])
+  }, [attachThumbnails])
 
   /** Clear the whole gallery — also wipes the persisted history on disk. */
   const clear = useCallback(async () => {
