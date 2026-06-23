@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
+import { useEffect, useState, type ReactNode } from "react"
 import {
   Check,
   ChevronDown,
@@ -25,44 +25,21 @@ import { AvatarSetupModal } from "@/components/avatar-setup-modal"
 import { ArticlePanel } from "@/components/article-panel"
 import { TitleBarStatus } from "@/components/title-bar-status"
 import type { StyleOption } from "@/components/style-picker"
-import { useIconPipeline } from "@/lib/icon-pipeline"
 import {
   useAvatar,
   useStyles,
   useAppMode,
   useApiKeyGate,
+  useGallery,
+  useGeneration,
+  type Plate,
 } from "@/components/app-content.hooks"
 import { EXAMPLE_PROMPTS } from "@/lib/examples"
 import { ipc } from "@/gen/ipc"
 import { cn } from "@/lib/utils"
 import appIcon from "../../../assets/app.png"
 
-/** One illustration in the gallery. A `historyId` tile is a collapsed past
- *  generation (thumbnail); clicking it expands its full variants. */
-interface Plate {
-  id: string
-  src: string
-  idea: string
-  look: string
-  /** Set when this tile is a persisted past generation loaded from history. */
-  historyId?: string
-  /** Number of variants in that past generation (for the ×N badge). */
-  count?: number
-}
-
-/**
- * Cap on the in-memory session gallery. Each full-res variant is a multi-MB
- * base64 string PLUS a decoded bitmap in the DOM, and the array was previously
- * never trimmed — a long session could climb to several GB. Plates beyond this
- * are dropped from the grid (oldest first); they remain in the on-disk history
- * store and reload as thumbnails, so nothing is lost. Newest plates (the user's
- * current work, prepended) are always kept.
- */
-const MAX_GALLERY_PLATES = 60
-
 export function AppContent() {
-  const [prompt, setPrompt] = useState("")
-  const [attachments, setAttachments] = useState<string[]>([])
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   // Structured failure class (GenerateIconResponse.error_reason) when available;
   // preferred over message string-matching to decide the "Update API key" action.
@@ -74,15 +51,11 @@ export function AppContent() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   // Full-screen image viewer (null = closed).
   const [lightbox, setLightbox] = useState<string | null>(null)
-  // The session gallery: every generated plate, newest first.
-  const [gallery, setGallery] = useState<Plate[]>([])
-  const [selectedPlateId, setSelectedPlateId] = useState<string | null>(null)
-  const [savedIds, setSavedIds] = useState<Set<string>>(() => new Set())
   // Unsaved illustrations also live in Article mode (a separate component).
   const [articleDirty, setArticleDirty] = useState(false)
 
-  // Deep hooks (RFC #4): each owns a cohesive slice of state + its IPC + mount
-  // effect. Aliased back to the original names so the view below is unchanged.
+  // Deep hooks (RFC #4): each owns a cohesive slice of state + its IPC + effects.
+  // Aliased back to the original names so the view below is unchanged.
   const avatar = useAvatar()
   const avatarReady = avatar.ready
   const avatarSrc = avatar.src
@@ -102,57 +75,47 @@ export function AppContent() {
   const openAIApiKeyManageReason = apiKeyGate.manageReason
   const setOpenAIApiKeyManageReason = apiKeyGate.setManageReason
 
-  const pipeline = useIconPipeline()
-  const prevPipelineStatusRef = useRef(pipeline.status)
-  const plateCounterRef = useRef(0)
-  // Metadata captured at generate time so the finished plates caption correctly.
-  // null when the next "done" came from loading history rather than generating.
-  const pendingMetaRef = useRef<{ idea: string; look: string } | null>(null)
+  const galleryState = useGallery()
+  const gallery = galleryState.plates
+  const selectedPlateId = galleryState.selectedId
+  const setSelectedPlateId = galleryState.setSelectedId
+  const savedIds = galleryState.savedIds
+  const selectedPlate = galleryState.selected
+  const galleryDirty = galleryState.dirty
+  const openHistory = galleryState.openHistory
+  const clearGallery = galleryState.clear
 
-  const selectedPlate = gallery.find((p) => p.id === selectedPlateId) ?? null
-  const isGenerating = pipeline.status === "generating"
-  const galleryDirty = gallery.some((p) => !savedIds.has(p.id))
+  const generation = useGeneration({
+    avatarReady,
+    onNeedAvatar: () => setAvatarModal("setup"),
+    selectedStyle,
+    selectedStyleLabel,
+    refinePlateSrc: selectedPlate?.src,
+    onVariants: galleryState.appendVariants,
+    onError: (message, reason) => {
+      setErrorReason(reason)
+      setErrorMessage(message)
+    },
+  })
+  const prompt = generation.prompt
+  const setPrompt = generation.setPrompt
+  const attachments = generation.attachments
+  const isGenerating = generation.isGenerating
+  const startGeneration = generation.start
+  const stopGeneration = generation.stop
+  const handleAttachClick = generation.attachFromPicker
+  const removeAttachment = generation.removeAttachment
+  const pipelineStatus = generation.status
+  const pipelineProgress = generation.progress
 
-  useEffect(() => {
-    // Past generations → the gallery grid (the grid IS the history now).
-    ipc.app
-      .GetHistory({})
-      .then((r) => {
-        const hist: Plate[] = r.items.map((raw) => {
-          const it = raw as unknown as {
-            id: string
-            prompt?: string
-            style?: string
-            thumbB64?: string
-            thumb_b64?: string
-            count?: number
-          }
-          return {
-            id: `h-${it.id}`,
-            src: `data:image/png;base64,${it.thumbB64 ?? it.thumb_b64 ?? ""}`,
-            idea: it.prompt || "Untitled",
-            look: it.style || "",
-            historyId: it.id,
-            count: it.count ?? 1,
-          }
-        })
-        if (hist.length === 0) return
-        // Dedupe by id — StrictMode runs this effect twice in dev, and we never
-        // want the same persisted generation to appear as two tiles.
-        setGallery((g) => {
-          const have = new Set(g.map((p) => p.id))
-          const add = hist.filter((p) => !have.has(p.id))
-          return add.length ? [...g, ...add].slice(0, MAX_GALLERY_PLATES) : g
-        })
-        setSavedIds((prev) => {
-          const next = new Set(prev)
-          for (const p of hist) next.add(p.id)
-          return next
-        })
-      })
-      .catch(() => {})
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  const savePlate = async (plate: Plate) => {
+    const r = await galleryState.save(plate)
+    if (r.status === "error") {
+      setErrorMessage(r.message ?? "Could not save the illustration.")
+    } else if (r.status === "saved") {
+      setSaveSuccess({ folderPath: r.savedPath ?? "", imagePath: r.imagePath ?? "" })
+    }
+  }
 
   // Forward uncaught UI errors to the main process (telemetry opt-out enforced there).
   useEffect(() => {
@@ -183,48 +146,6 @@ export function AppContent() {
     }
   }, [])
 
-  const clearAttachments = useCallback(() => {
-    setAttachments((prev) => {
-      for (const url of prev) {
-        if (url.startsWith("blob:")) URL.revokeObjectURL(url)
-      }
-      return []
-    })
-  }, [])
-
-  // Pipeline status → gallery. On a fresh generation completing, append the new
-  // plates (newest first) and select the first. Errors surface in a modal.
-  useEffect(() => {
-    const was = prevPipelineStatusRef.current
-    prevPipelineStatusRef.current = pipeline.status
-    if (was === pipeline.status) return
-
-    if (pipeline.status === "done") {
-      const meta = pendingMetaRef.current
-      pendingMetaRef.current = null
-      if (!meta) return // came from loadVariants (history), not a generation
-      const fresh: Plate[] = pipeline.variants
-        .filter((v): v is string => v !== null)
-        .map((src) => ({
-          id: `p${++plateCounterRef.current}`,
-          src,
-          idea: meta.idea,
-          look: meta.look,
-        }))
-      if (fresh.length === 0) return
-      setGallery((g) => [...fresh, ...g].slice(0, MAX_GALLERY_PLATES))
-      // Don't auto-select: leave Generate as "Generate" so the next idea starts
-      // fresh. Selecting a plate is an explicit choice to refine from it.
-      setSelectedPlateId(null)
-      clearAttachments()
-    } else if (pipeline.status === "error") {
-      pendingMetaRef.current = null
-      const raw = pipeline.progress.label
-      setErrorReason(pipeline.errorReason || "")
-      setErrorMessage(raw.startsWith("Error: ") ? raw.slice(7) : raw)
-    }
-  }, [pipeline.status, pipeline.variants, pipeline.progress.label, pipeline.errorReason, clearAttachments])
-
   // Quit guard: any unsaved plate (gallery or article) is unsaved work.
   useEffect(() => {
     ipc.app.SetUnsavedIconState({ unsaved: galleryDirty || articleDirty }).catch(() => {})
@@ -242,118 +163,6 @@ export function AppContent() {
       /* localStorage unavailable — the info button still works */
     }
   }, [avatarReady, avatarModal, openAIApiKeyStartupOpen])
-
-  // ⌘V anywhere attaches a pasted image as a reference.
-  useEffect(() => {
-    const onPaste = (e: ClipboardEvent) => {
-      const items = e.clipboardData?.items
-      if (!items) return
-      const files: File[] = []
-      for (let i = 0; i < items.length; i++) {
-        const item = items[i]
-        if (item.kind === "file" && item.type.startsWith("image/")) {
-          const f = item.getAsFile()
-          if (f) files.push(f)
-        }
-      }
-      if (files.length === 0) return
-      e.preventDefault()
-      Promise.all(
-        files.map(
-          (file) =>
-            new Promise<string>((resolve, reject) => {
-              const reader = new FileReader()
-              reader.onloadend = () => resolve(reader.result as string)
-              reader.onerror = () => reject(reader.error)
-              reader.readAsDataURL(file)
-            })
-        )
-      )
-        .then((urls) => setAttachments((prev) => [...prev, ...urls]))
-        .catch(() => {})
-    }
-    document.addEventListener("paste", onPaste)
-    return () => document.removeEventListener("paste", onPaste)
-  }, [])
-
-  const handleAttachClick = async () => {
-    try {
-      const res = await ipc.app.PickReferenceImage({})
-      if (res.canceled || !res.imageB64) return
-      setAttachments((prev) => [...prev, `data:${res.mime || "image/png"};base64,${res.imageB64}`])
-    } catch {
-      /* ignore — the user can retry */
-    }
-  }
-
-  const startGeneration = () => {
-    if (!prompt.trim() || isGenerating) return
-    if (!avatarReady) {
-      setAvatarModal("setup")
-      return
-    }
-    // Refine from the chosen plate if one is selected; else an attached reference.
-    const reference = selectedPlate?.src ?? attachments[0]
-    pendingMetaRef.current = { idea: prompt.trim(), look: selectedStyleLabel }
-    pipeline.generate(prompt, reference, selectedStyle)
-  }
-
-  const stopGeneration = () => pipeline.cancel()
-
-  const savePlate = async (plate: Plate) => {
-    try {
-      const response = await fetch(plate.src)
-      const buffer = await response.arrayBuffer()
-      const imageData = new Uint8Array(buffer)
-      const saved = await ipc.app.SaveIcon({ imageData })
-      if (saved.error) {
-        setErrorMessage(saved.error)
-        return
-      }
-      if (!saved.canceled && saved.imagePath) {
-        setSavedIds((prev) => new Set(prev).add(plate.id))
-        setSaveSuccess({ folderPath: saved.savedPath, imagePath: saved.imagePath })
-      }
-    } catch {
-      setErrorMessage("Could not save the illustration.")
-    }
-  }
-
-  // Clicking a collapsed history tile expands it: load its full-res variants,
-  // drop the thumbnail, and surface the variants at the top of the grid.
-  const openHistory = useCallback(async (plate: Plate) => {
-    if (!plate.historyId) return
-    try {
-      const res = await ipc.app.GetHistoryItem({ id: plate.historyId })
-      if (res.images.length === 0) return
-      const fresh: Plate[] = res.images.map((b) => ({
-        id: `p${++plateCounterRef.current}`,
-        src: `data:image/png;base64,${b}`,
-        idea: plate.idea,
-        look: plate.look,
-      }))
-      setGallery((g) => [...fresh, ...g.filter((p) => p.id !== plate.id)].slice(0, MAX_GALLERY_PLATES))
-      setSavedIds((prev) => {
-        const next = new Set(prev)
-        for (const p of fresh) next.add(p.id)
-        return next
-      })
-      setSelectedPlateId(null)
-    } catch {
-      /* ignore */
-    }
-  }, [])
-
-  // Clear the whole gallery — also wipes the persisted history on disk.
-  const clearGallery = useCallback(async () => {
-    await ipc.app.ClearHistory({}).catch(() => {})
-    setGallery([])
-    setSavedIds(new Set())
-    setSelectedPlateId(null)
-  }, [])
-
-  const removeAttachment = (index: number) =>
-    setAttachments((prev) => prev.filter((_, i) => i !== index))
 
   return (
     <div className="flex h-screen bg-background text-foreground overflow-hidden">
@@ -501,10 +310,10 @@ export function AppContent() {
 
       {/* ── Main surface ───────────────────────────────────────────────── */}
       <main className="relative flex-1 min-w-0 flex flex-col">
-        {pipeline.status === "downloading" && pipeline.progress.label !== "" && (
+        {pipelineStatus === "downloading" && pipelineProgress.label !== "" && (
           <TitleBarStatus
-            label={pipeline.progress.label}
-            fraction={pipeline.progress.fraction}
+            label={pipelineProgress.label}
+            fraction={pipelineProgress.fraction}
             isError={false}
           />
         )}
