@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react"
-import { Download, ImageIcon, Link2, Loader2, Maximize2, RefreshCw, Sparkles } from "lucide-react"
+import { Check, Download, ImageIcon, Link2, Loader2, Maximize2, Plus, RefreshCw, Sparkles } from "lucide-react"
 import { ipc } from "@/gen/ipc"
 import type { Shot } from "@/gen/app"
 import { EXAMPLE_ARTICLES, EXAMPLE_ARTICLE_URLS } from "@/lib/examples"
@@ -12,6 +12,8 @@ type ShotResult = {
   saved?: boolean
   /** The failure reason from the engine, shown on the card when status is error. */
   error?: string
+  /** Whether this shot is included in "Generate selected". Undefined = selected. */
+  draw?: boolean
 }
 
 /** Build the per-shot generation prompt from its idea + suggested labels. */
@@ -60,6 +62,9 @@ export function ArticlePanel({
   const [fetching, setFetching] = useState(false)
   const [fetchError, setFetchError] = useState<string | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
+  // "More ideas" expansion + the manually-added-shot draft.
+  const [moreLoading, setMoreLoading] = useState(false)
+  const [draftShot, setDraftShot] = useState("")
 
   const trimmed = article.trim()
   const isUrl = looksLikeUrl(trimmed)
@@ -105,8 +110,10 @@ export function ArticlePanel({
     }
   }, [article, planning])
 
-  const setResult = useCallback((i: number, r: ShotResult) => {
-    setResults((prev) => prev.map((x, j) => (j === i ? r : x)))
+  // Merge a patch so flags the batch cares about (draw/saved) survive a status
+  // change — generateOne only sends {status,image,error}.
+  const setResult = useCallback((i: number, patch: Partial<ShotResult>) => {
+    setResults((prev) => prev.map((x, j) => (j === i ? { ...x, ...patch } : x)))
   }, [])
 
   const generateOne = useCallback(
@@ -155,18 +162,56 @@ export function ArticlePanel({
   )
 
   const generateAll = useCallback(async () => {
-    if (batchRunning || shots.length === 0) return
+    if (batchRunning) return
     if (!avatarReady) {
       onNeedAvatar()
       return
     }
+    // Only the selected shots (draw !== false), drawn in parallel.
+    const targets = shots.map((_, i) => i).filter((i) => results[i]?.draw !== false)
+    if (targets.length === 0) return
     setBatchRunning(true)
-    // Sequential to stay gentle on rate limits.
-    for (let i = 0; i < shots.length; i++) {
-      await generateOne(i)
-    }
+    await Promise.all(targets.map((i) => generateOne(i)))
     setBatchRunning(false)
-  }, [batchRunning, shots, generateOne, avatarReady, onNeedAvatar])
+  }, [batchRunning, shots, results, generateOne, avatarReady, onNeedAvatar])
+
+  /** Toggle whether a shot is included in the batch. */
+  const toggleDraw = useCallback((i: number) => {
+    setResults((prev) => prev.map((x, j) => (j === i ? { ...x, draw: x.draw === false } : x)))
+  }, [])
+
+  /** Append a shot the user typed in themselves. */
+  const addShot = useCallback(() => {
+    const idea = draftShot.trim()
+    if (!idea) return
+    const theme = idea.split(/\s+/).slice(0, 4).join(" ")
+    setShots((prev) => [...prev, { theme, coreIdea: idea, labels: [] }])
+    setResults((prev) => [...prev, { status: "idle" as const, image: null }])
+    setDraftShot("")
+  }, [draftShot])
+
+  /** Ask the model for more candidate shots and append the genuinely-new ones. */
+  const moreShots = useCallback(async () => {
+    if (!article.trim() || moreLoading) return
+    setMoreLoading(true)
+    setPlanError(null)
+    try {
+      const res = await ipc.app.MakeShotList({ article })
+      if (res.error) {
+        setPlanError(res.error)
+        return
+      }
+      const have = new Set(shots.map((s) => s.coreIdea.trim().toLowerCase()))
+      const fresh = res.shots.filter((s) => !have.has(s.coreIdea.trim().toLowerCase()))
+      if (fresh.length === 0) return
+      setShots((prev) => [...prev, ...fresh])
+      setResults((prev) => [...prev, ...fresh.map(() => ({ status: "idle" as const, image: null }))])
+    } catch {
+      setPlanError("Could not reach the model. Check your API key and connection.")
+    } finally {
+      setMoreLoading(false)
+    }
+  }, [article, moreLoading, shots])
 
   const save = useCallback(
     async (i: number) => {
@@ -212,6 +257,7 @@ export function ArticlePanel({
   // ── Shot list + results ────────────────────────────────────────────────
   if (hasShots) {
     const doneCount = results.filter((r) => r.image).length
+    const selectedCount = shots.filter((_, i) => results[i]?.draw !== false).length
     return (
       <div className="flex h-full w-full flex-col overflow-hidden px-6 pt-4 pb-6">
         <div className="mb-4 flex shrink-0 items-center justify-between">
@@ -219,6 +265,9 @@ export function ArticlePanel({
             <span className="tnum">
               {shots.length} {shots.length === 1 ? "idea" : "ideas"}
             </span>
+            {selectedCount !== shots.length && (
+              <span className="text-muted-foreground/60 tnum">· {selectedCount} selected</span>
+            )}
             {doneCount > 0 && <span className="text-muted-foreground/60 tnum">· {doneCount} drawn</span>}
           </div>
           <div className="flex items-center gap-2">
@@ -231,12 +280,26 @@ export function ArticlePanel({
             </button>
             <button
               type="button"
-              disabled={batchRunning}
+              disabled={moreLoading}
+              onClick={() => void moreShots()}
+              title="Ask the model for more candidate ideas"
+              className="flex items-center gap-1.5 h-8 px-3 rounded-md text-xs font-medium text-muted-foreground transition-[transform,color,background-color] hover:text-foreground hover:bg-foreground/5 active:scale-[0.97] disabled:opacity-50"
+            >
+              {moreLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+              More ideas
+            </button>
+            <button
+              type="button"
+              disabled={batchRunning || selectedCount === 0}
               onClick={() => void generateAll()}
               className="flex items-center gap-1.5 h-8 px-4 rounded-md text-xs font-medium bg-primary text-primary-foreground shadow-sm transition-[transform,background-color] hover:bg-primary/90 active:scale-[0.97] disabled:opacity-50 disabled:active:scale-100"
             >
               {batchRunning ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-              {batchRunning ? "Drawing…" : "Generate all"}
+              {batchRunning
+                ? "Drawing…"
+                : selectedCount === shots.length
+                  ? "Generate all"
+                  : `Generate ${selectedCount}`}
             </button>
           </div>
         </div>
@@ -253,7 +316,10 @@ export function ArticlePanel({
             return (
               <figure
                 key={i}
-                className="group plate-in flex flex-col"
+                className={cn(
+                  "group plate-in flex flex-col transition-opacity",
+                  r.draw === false && "opacity-55"
+                )}
                 style={{ animationDelay: `${Math.min(i, 5) * 45}ms` }}
               >
                 <div
@@ -262,6 +328,21 @@ export function ArticlePanel({
                     "shadow-[0_1px_2px_-1px_rgba(28,26,23,0.05),0_5px_14px_-10px_rgba(28,26,23,0.14)]"
                   )}
                 >
+                  {/* Include/exclude this shot from the batch. */}
+                  <button
+                    type="button"
+                    onClick={() => toggleDraw(i)}
+                    title={r.draw === false ? "Include in Generate" : "Exclude from Generate"}
+                    aria-label={r.draw === false ? "Include in Generate" : "Exclude from Generate"}
+                    className={cn(
+                      "absolute left-1.5 top-1.5 z-10 flex h-5 w-5 items-center justify-center rounded-[5px] border transition-colors",
+                      r.draw === false
+                        ? "border-border bg-white/85 text-transparent hover:border-foreground/40"
+                        : "border-[var(--brand)] bg-[var(--brand)] text-white"
+                    )}
+                  >
+                    <Check className="h-3 w-3" strokeWidth={3} />
+                  </button>
                   <div className="relative flex aspect-[16/9] items-center justify-center">
                     {r.image ? (
                       <img
@@ -336,6 +417,31 @@ export function ArticlePanel({
               </figure>
             )
           })}
+        </div>
+
+        {/* Add your own shot (for your own writing / custom ideas). */}
+        <div className="mt-3 flex shrink-0 items-center gap-2">
+          <input
+            value={draftShot}
+            onChange={(e) => setDraftShot(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault()
+                addShot()
+              }
+            }}
+            placeholder="Add your own shot — describe what to draw…"
+            className="h-9 flex-1 rounded-lg border border-border bg-secondary/30 px-3 text-[13px] text-foreground placeholder:text-muted-foreground outline-none transition-[border-color,box-shadow] focus:border-foreground/40 focus:ring-2 focus:ring-foreground/[0.06]"
+          />
+          <button
+            type="button"
+            disabled={!draftShot.trim()}
+            onClick={addShot}
+            className="flex h-9 shrink-0 items-center gap-1.5 rounded-lg bg-secondary/60 px-3.5 text-[13px] font-medium text-foreground transition-[transform,background-color] hover:bg-secondary active:scale-[0.97] disabled:opacity-40 disabled:active:scale-100"
+          >
+            <Plus className="h-4 w-4" />
+            Add
+          </button>
         </div>
       </div>
     )
