@@ -18,6 +18,13 @@ This never changes — only the avatar and the look are parameters.
 6. **It is not** a photo, a logo, a corporate infographic, a formal flowchart,
    or a UI mockup.
 
+## Register
+
+One **caught scene** (the avatar mid-action) is the default. Switch to the
+**explainer** register — a hand-drawn sketch-diagram — only when the user asks or
+the idea is itself a traceable structure (a pipeline, fan-out, timeline, loop,
+stack). The methodology above holds in both. See `composition.md`.
+
 ## Articles → shot list
 
 Read the piece, list the 4–8 ideas worth an image (theme + the one sentence to
