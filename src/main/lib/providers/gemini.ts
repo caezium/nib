@@ -1,9 +1,8 @@
 import type {
-  ImageProvider,
   GenerationRequest,
-  GenerationResult,
+  NormalizedReference,
 } from "../image-provider";
-import { GenerationError } from "../image-provider";
+import { BaseImageProvider, GenerationError } from "../image-provider";
 import { spawn } from "node:child_process";
 import * as fs from "node:fs";
 import * as os from "node:os";
@@ -20,43 +19,17 @@ const OUTPUT_NAME = "nib-output.png";
  * Codex, image output depends on the user's Gemini CLI media tooling/extensions,
  * so we ask it to save a PNG in a temp workspace and then verify the file.
  */
-export class GeminiProvider implements ImageProvider {
-  async generate(request: GenerationRequest): Promise<GenerationResult> {
-    const count = Math.max(1, request.count);
-    const settled = await Promise.allSettled(
-      Array.from({ length: count }, () => this.generateOne(request))
-    );
-    const images = settled
-      .filter((r): r is PromiseFulfilledResult<string> => r.status === "fulfilled")
-      .map((r) => r.value);
-
-    if (images.length === 0) {
-      const rejection = settled.find((r) => r.status === "rejected") as
-        | PromiseRejectedResult
-        | undefined;
-      const reason = rejection?.reason;
-      throw reason instanceof Error
-        ? reason
-        : new Error(String(reason ?? "Gemini returned no image."));
-    }
-    return { images };
-  }
-
-  private async generateOne(request: GenerationRequest): Promise<string> {
+export class GeminiProvider extends BaseImageProvider {
+  protected async generateOne(
+    request: GenerationRequest,
+    ref: NormalizedReference | undefined
+  ): Promise<string> {
     const workdir = fs.mkdtempSync(path.join(os.tmpdir(), "nib-gemini-"));
     try {
       let avatarPath = "";
-      if (request.referenceImageB64) {
-        const mime = request.referenceImageMime || "image/png";
-        const ext = mime.includes("jpeg")
-          ? "jpg"
-          : mime.includes("webp")
-            ? "webp"
-            : mime.includes("gif")
-              ? "gif"
-              : "png";
-        avatarPath = path.join(workdir, `avatar.${ext}`);
-        fs.writeFileSync(avatarPath, Buffer.from(request.referenceImageB64, "base64"));
+      if (ref) {
+        avatarPath = path.join(workdir, `avatar.${ref.ext}`);
+        fs.writeFileSync(avatarPath, Buffer.from(ref.b64, "base64"));
       }
 
       const outputPath = path.join(workdir, OUTPUT_NAME);

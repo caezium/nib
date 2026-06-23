@@ -95,3 +95,74 @@ export async function withRetry<T>(
   }
   throw lastError;
 }
+
+// ---------------------------------------------------------------------------
+// Reference image + fan-out template (shared by the per-image providers)
+// ---------------------------------------------------------------------------
+
+/** A request's reference image, resolved once: MIME defaulted, extension mapped. */
+export interface NormalizedReference {
+  /** Base64 payload, no data URL prefix. */
+  b64: string;
+  /** MIME type, defaulted to `image/png` when the request omitted it. */
+  mime: string;
+  /** File extension matching the MIME — for providers that write a temp file. */
+  ext: "png" | "jpg" | "webp" | "gif";
+}
+
+/**
+ * Resolve a request's reference image once, replacing the MIME-default +
+ * MIME→ext mapping that every provider used to repeat. Returns undefined for a
+ * text-to-image request (no reference).
+ */
+export function normalizeReference(
+  request: GenerationRequest
+): NormalizedReference | undefined {
+  if (!request.referenceImageB64) return undefined;
+  const mime = request.referenceImageMime?.trim() || "image/png";
+  const ext = mime.includes("jpeg")
+    ? "jpg"
+    : mime.includes("webp")
+      ? "webp"
+      : mime.includes("gif")
+        ? "gif"
+        : "png";
+  return { b64: request.referenceImageB64, mime, ext };
+}
+
+/**
+ * Template-method base for providers that produce ONE image per call and fan
+ * out `count` of them concurrently. It owns the fan-out, the
+ * first-error-wins surfacing, and reference normalization; a subclass
+ * implements only `generateOne`. (OpenAI's batch `/images` API and the mock
+ * provider don't fan out, so they implement `ImageProvider` directly.)
+ */
+export abstract class BaseImageProvider implements ImageProvider {
+  protected abstract generateOne(
+    request: GenerationRequest,
+    ref: NormalizedReference | undefined
+  ): Promise<string>;
+
+  async generate(request: GenerationRequest): Promise<GenerationResult> {
+    const ref = normalizeReference(request);
+    const count = Math.max(1, request.count);
+    const settled = await Promise.allSettled(
+      Array.from({ length: count }, () => this.generateOne(request, ref))
+    );
+    const images = settled
+      .filter((r): r is PromiseFulfilledResult<string> => r.status === "fulfilled")
+      .map((r) => r.value);
+    if (images.length === 0) {
+      // Surface the first failure (preserves a non-retryable GenerationError's
+      // reason so the UI can react).
+      const rejection = settled.find((r) => r.status === "rejected") as
+        | PromiseRejectedResult
+        | undefined;
+      const reason = rejection?.reason;
+      throw reason instanceof Error
+        ? reason
+        : new Error(String(reason ?? "Provider returned no image."));
+    }
+    return { images };
+  }
+}
