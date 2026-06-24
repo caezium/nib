@@ -25,6 +25,14 @@ reference on every generation, it stays on-model across an entire piece.
 
 *…and the same character illustrating actual ideas — momentum, debugging, deep focus.*
 
+<p>
+  <img src="site/concepts/app-rubberduck.jpg" width="32%" alt="rubber-duck debugging — explaining a problem to a rubber duck" />
+  <img src="site/concepts/app-shipit.jpg" width="32%" alt="ship it early — driving a patched-together cart, fixing it on the move" />
+  <img src="site/concepts/app-interest.jpg" width="32%" alt="compound interest — a seesaw tipping as percentage blocks stack up" />
+</p>
+
+*Real plates straight from the app — a different character, any concept, still on-model.*
+
 **[nib.henryzh.dev](https://nib.henryzh.dev)** · Free & open source · MIT
 
 </div>
