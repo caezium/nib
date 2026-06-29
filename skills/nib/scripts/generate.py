@@ -23,6 +23,10 @@ Usage:
   python3 generate.py --idea "saying no protects the few things that matter" \
       --avatar-pack blip --backend codex --out out.png
 """
+# Defer annotation evaluation so the `X | None` (PEP 604) hints below don't
+# require Python 3.10 — stock macOS still ships /usr/bin/python3 = 3.9.
+from __future__ import annotations
+
 import argparse
 import base64
 import binascii
@@ -164,6 +168,12 @@ def _write(out: str, data: bytes) -> None:
 
 # --- backends ----------------------------------------------------------------
 
+class CodexRenderError(Exception):
+    """Codex ran but produced no usable image (timed out, plan not entitled —
+    HTTP 403, exec extension off, …). Recoverable: the caller can fall back to
+    OpenRouter when a key is set, instead of aborting."""
+
+
 def generate_openrouter(prompt: str, avatar: str | None, out: str, model: str) -> str:
     key = os.environ.get("OPENROUTER_API_KEY", "").strip()
     if not key:
@@ -222,11 +232,24 @@ def _codex_run(args: list[str]) -> tuple[int, str]:
 
 
 def _codex_features() -> dict[str, bool]:
+    """Parse `codex features list` into {feature: enabled}.
+
+    Each row is `<name>  <status>  <true|false>`; we read the actual boolean,
+    not mere presence of the word — `imagegenext` is printed as a row even while
+    it's `under development  false`, so a substring check would falsely report it
+    as on. (nib still passes `--enable imagegenext` per render; `features list`
+    state and per-render enablement are separate things.)
+    """
     rc, out = _codex_run(["features", "list"])
-    low = out.lower()
+    enabled: dict[str, bool] = {}
+    if rc == 0:
+        for line in out.splitlines():
+            parts = line.split()
+            if len(parts) >= 2 and parts[-1] in ("true", "false"):
+                enabled[parts[0]] = parts[-1] == "true"
     return {
-        "image_generation": rc == 0 and "image_generation" in low,
-        "imagegenext": rc == 0 and "imagegenext" in low,
+        "image_generation": enabled.get("image_generation", False),
+        "imagegenext": enabled.get("imagegenext", False),
     }
 
 
@@ -254,7 +277,7 @@ def generate_codex(prompt: str, avatar: str | None, out: str) -> str:
     into ~/.codex/generated_images/<session>/; we pick up the new file.
     """
     if not codex_available():
-        sys.exit("error: --backend codex needs the Codex CLI. Install it and run `codex login`.")
+        raise CodexRenderError("the Codex CLI isn't available — install it and run `codex login`.")
     gen_root = os.path.expanduser("~/.codex/generated_images")
     pat = os.path.join(gen_root, "**", "*.png")
     before = set(glob.glob(pat, recursive=True)) if os.path.isdir(gen_root) else set()
@@ -273,21 +296,28 @@ def generate_codex(prompt: str, avatar: str | None, out: str) -> str:
     if avatar:
         cmd += ["-i", avatar]
     # Pass the prompt on stdin: `-i` is variadic (<FILE>...) and would otherwise
-    # swallow a positional prompt argument as another image file.
+    # swallow a positional prompt argument as another image file. Capture output
+    # (merged) so a tool-level failure — e.g. an entitlement HTTP 403, which does
+    # NOT make `codex exec` itself exit non-zero — can be surfaced precisely.
     try:
-        subprocess.run(cmd, input=instruction.encode(), check=True, timeout=480,
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        proc = subprocess.run(cmd, input=instruction.encode(), timeout=480,
+                              stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     except subprocess.TimeoutExpired:
-        sys.exit("error: Codex timed out generating the image.")
-    except subprocess.CalledProcessError as e:
-        sys.exit(f"error: Codex failed (exit {e.returncode}). Try `codex login`, or use --backend openrouter.")
+        raise CodexRenderError("Codex timed out generating the image.")
     finally:
         shutil.rmtree(workdir, ignore_errors=True)
 
     after = glob.glob(pat, recursive=True) if os.path.isdir(gen_root) else []
     fresh = [p for p in after if p not in before]
     if not fresh:
-        sys.exit("error: Codex produced no image (your plan may not include image generation). Use --backend openrouter.")
+        log = (proc.stdout or b"").decode("utf-8", "replace").lower()
+        if "403" in log or "forbidden" in log:
+            raise CodexRenderError(
+                "Codex image generation returned HTTP 403 Forbidden — your ChatGPT/Codex "
+                "plan isn't currently entitled to image generation on this account.")
+        raise CodexRenderError(
+            "Codex produced no image (the imagegenext exec extension may be off, or your "
+            "plan isn't entitled to image generation).")
     newest = max(fresh, key=os.path.getmtime)
     with open(newest, "rb") as f:
         _write(out, f.read())
@@ -316,7 +346,9 @@ def doctor() -> None:
         print(f"  codex login:        {'logged in' if logged else 'NOT logged in — run `codex login`'}")
         f = _codex_features()
         print(f"  image_generation:   {'yes' if f['image_generation'] else 'no'}")
-        print(f"  imagegenext:        {'yes' if f['imagegenext'] else 'no — exec emits no image without it'}")
+        print(f"  imagegenext:        {'enabled' if f['imagegenext'] else 'off in features list (nib enables it per render with --enable)'}")
+        print( "  plan entitlement:   only provable at render time — an HTTP 403 there means")
+        print( "                      your plan isn't entitled (nib auto-falls back to OpenRouter if a key is set)")
     key = os.environ.get("OPENROUTER_API_KEY", "").strip()
     print(f"  OPENROUTER_API_KEY: {'set' if key else 'not set'}")
     print(f"  default model:      {DEFAULT_MODEL}")
@@ -342,6 +374,8 @@ def main() -> None:
     p.add_argument("--accent", default="", help="hex or named accent colour (the one problem/result accent)")
     p.add_argument("--register", default="editorial", choices=["editorial", "explainer"],
                    help="editorial scene (default) or explainer sketch-diagram")
+    p.add_argument("--transparent", action="store_true",
+                   help="cut the white background out of the render (needs rembg; see cutout.py)")
     p.add_argument("--out", help="output PNG path")
     p.add_argument("--backend", default="auto", choices=["auto", "openrouter", "codex"],
                    help="auto (default), openrouter (your API key), or codex (your ChatGPT sub — free)")
@@ -367,9 +401,31 @@ def main() -> None:
     prompt = build_prompt(args.idea, style, avatar_spec, args.accent, args.register)
     backend = resolve_backend(args.backend)
     if backend == "codex":
-        print(generate_codex(prompt, avatar, args.out))
+        try:
+            out_path = generate_codex(prompt, avatar, args.out)
+        except CodexRenderError as e:
+            # The free lane failed (commonly an entitlement 403). Don't lose the
+            # request: fall back to OpenRouter when a key is configured.
+            if os.environ.get("OPENROUTER_API_KEY", "").strip():
+                print(f"note: free Codex lane unavailable — {e}\n"
+                      f"      falling back to OpenRouter.", file=sys.stderr)
+                out_path = generate_openrouter(prompt, avatar, args.out, args.model)
+            else:
+                sys.exit(f"error: {e}\n"
+                         f"Set OPENROUTER_API_KEY to render on the paid lane instead "
+                         f"(a few cents an image).")
     else:
-        print(generate_openrouter(prompt, avatar, args.out, args.model))
+        out_path = generate_openrouter(prompt, avatar, args.out, args.model)
+
+    if args.transparent:
+        sys.path.insert(0, HERE)
+        from cutout import remove_bg, RembgMissing
+        try:
+            remove_bg(out_path)
+        except RembgMissing as e:
+            print(f"warning: {e}\n  kept the opaque render at {out_path}.", file=sys.stderr)
+
+    print(out_path)
 
 
 if __name__ == "__main__":
