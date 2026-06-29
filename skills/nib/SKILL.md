@@ -6,7 +6,7 @@ description: >-
   caught scene per idea, in one of several print looks. Use when the user asks
   to illustrate a post/article/concept with a consistent character, or invokes
   "nib". Not for generic draw/make-an-image requests.
-version: 0.1.1
+version: 0.1.2
 argument-hint: "[idea or article path/URL] | build a character | set avatar <image> | style <name> | explainer"
 license: MIT
 metadata:
@@ -86,6 +86,10 @@ mockup.
      colour); see `references/palettes.md`.
    - `--register explainer` — draw a hand-built sketch-diagram instead of a single
      caught scene (`references/composition.md`).
+   - `--transparent` — cut the white ground out of the render → transparent PNG
+     (for slides, stickers, dark UI). Needs `rembg` (`pip install 'rembg[cpu]'`,
+     not bundled); without it the opaque render is kept and a hint is printed. Also
+     available standalone on any image: `python3 scripts/cutout.py <image.png>`.
    - `--doctor` — print backend readiness (which lane will run, and why) and exit.
 5. **Review** against `references/quality-bar.md` (white background, one idea,
    avatar performing the action, short labels only, not a slide). Regenerate

@@ -4,10 +4,12 @@
 
 ### Anyone can make one good AI illustration. Making the *10th* still look like **you** is the hard part.
 
-Nib turns an idea — or a whole article — into original, white-background, hand-drawn
-**editorial illustrations** that all star **one character you own**. One image, one idea.
-The character *performs* the idea; it never just sits there. Because it's sent as the
-reference on every generation, it stays on-model across an entire piece.
+**Nib turns an idea — or a whole article — into hand-drawn editorial illustrations for your
+blog post, newsletter, or docs.** Every image is white-background, one-idea-per-image, and
+stars **one character you own** (a mascot, a logo character, anything). The character
+*performs* the idea — pushes it, sorts it, steers it — instead of just posing. And because
+it's sent as the reference on every render, it stays on-model across the whole piece: the
+2nd, 5th, and 10th image still look like the 1st.
 
 <p>
   <img src="site/gallery/marker.jpg" width="32%" alt="marker look" />
@@ -23,7 +25,7 @@ reference on every generation, it stays on-model across an entire piece.
   <img src="site/concepts/focus.jpg" width="32%" alt="deep focus — working inside a glowing bubble while the world fades" />
 </p>
 
-*…and the same character illustrating actual ideas — momentum, debugging, deep focus.*
+*Three ideas in, three scenes out — `building momentum`, `debugging`, `deep focus` — the same character performing each.*
 
 <p>
   <img src="site/concepts/app-rubberduck.jpg" width="32%" alt="rubber-duck debugging — explaining a problem to a rubber duck" />
@@ -113,7 +115,14 @@ python3 skills/nib/scripts/generate.py \
 ```
 
 Flags: `--backend auto|openrouter|codex` · `--model <id>` · `--avatar-pack <name>` ·
-`--avatar-spec "<text>"`. Dependency-free (`python3` only).
+`--avatar-spec "<text>"` · `--register explainer` · `--transparent` · `--doctor`.
+Dependency-free (`python3` 3.9+ only).
+
+**Transparent cutouts.** Add `--transparent` to lift the art off its white ground into a
+transparent PNG — for slides, stickers, or dark UI. It uses [`rembg`](https://github.com/danielgatis/rembg)
+(`pip install 'rembg[cpu]'`), which isn't bundled, so the core stays dependency-free; without
+it the opaque render is kept. Works standalone on any image too:
+`python3 skills/nib/scripts/cutout.py <image.png>`.
 
 ## The desktop app
 
