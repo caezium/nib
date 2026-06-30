@@ -1,7 +1,7 @@
 {
   "name": "nib",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.2.1",
   "type": "module",
   "description": "Turn any idea or article into original white-background editorial illustrations starring an avatar you own.",
   "license": "MIT",

@@ -65,8 +65,8 @@ export class CodexProvider extends BaseImageProvider {
       const pngs = fs.existsSync(sessionDir) ? collectPngs(sessionDir) : [];
       if (pngs.length === 0) {
         throw new GenerationError(
-          "declined",
-          "Codex produced no new image — your plan may not include image generation, or it declined the request. Switch to OpenRouter in Settings."
+          "not_entitled",
+          "Codex produced no image — your ChatGPT / Codex plan isn't currently entitled to image generation (the API returns HTTP 403). Add an OpenRouter key and Nib falls back automatically, or switch to OpenRouter in Settings."
         );
       }
       const newest = pngs.sort(
@@ -114,6 +114,19 @@ function runCodex(args: string[], promptStdin: string): Promise<string> {
     child.on("close", (code) => {
       clearTimeout(timer);
       if (code !== 0) {
+        // A 403 means the logged-in plan isn't entitled to image generation —
+        // distinct from a transient failure, and the trigger for the automatic
+        // OpenRouter fallback (see provider-resolver). `codex exec` doesn't
+        // always exit non-zero on it, so we also detect the no-image case above.
+        if (/\b403\b|forbidden|not entitled|no access to|usage policy/i.test(err)) {
+          reject(
+            new GenerationError(
+              "not_entitled",
+              "Codex returned HTTP 403 — your ChatGPT / Codex plan isn't currently entitled to image generation. Add an OpenRouter key and Nib falls back automatically, or switch to OpenRouter in Settings."
+            )
+          );
+          return;
+        }
         reject(
           new GenerationError(
             "declined",

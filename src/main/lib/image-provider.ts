@@ -53,6 +53,7 @@ export type GenerationErrorReason =
   | "timeout" // request exceeded the provider's budget
   | "unsupported_model" // selected model can't emit images
   | "declined" // model refused / returned no image
+  | "not_entitled" // free CLI lane's plan lacks image-gen entitlement (HTTP 403)
   | "unknown";
 
 /**

@@ -13,11 +13,12 @@
 // subprocesses. Everything else (prefs, env, saved key) is a deterministic read.
 // ---------------------------------------------------------------------------
 
-import type {
-  ImageProvider,
-  ProviderName,
-  GenerationRequest,
-  GenerationResult,
+import {
+  GenerationError,
+  type ImageProvider,
+  type ProviderName,
+  type GenerationRequest,
+  type GenerationResult,
 } from "./image-provider";
 import { OpenAIProvider } from "./providers/openai";
 import { OpenRouterProvider } from "./providers/openrouter";
@@ -203,11 +204,38 @@ export function resolveProvider(probe: CliProbe = realCliProbe): ResolvedProvide
   const name = resolveProviderName(probe);
   return {
     name,
-    generate: (request) => providerInstance(name).generate(request),
+    generate: (request) => generateWithFallback(name, request),
     planShots: (article) => planShotList(name, article),
     blocked: blockedReason(name, probe),
     needsApiKey: name === "openai" || name === "openrouter",
   };
+}
+
+/**
+ * Run the image lane on the resolved provider, but if a free CLI lane fails
+ * because its plan isn't entitled to image generation (Codex's HTTP 403) — or
+ * the CLI vanished — automatically retry on the user's keyed provider when a
+ * key is configured. This is the one case the cascade can't foresee: Codex
+ * looks usable (logged in, CLI present) and only the render reveals the 403.
+ * We fall back ONLY on those recoverable reasons, never on a genuine content
+ * refusal, a timeout, or out-of-credits.
+ */
+async function generateWithFallback(
+  name: ProviderName,
+  request: GenerationRequest
+): Promise<GenerationResult> {
+  try {
+    return await providerInstance(name).generate(request);
+  } catch (err) {
+    const recoverable =
+      err instanceof GenerationError &&
+      (err.reason === "not_entitled" || err.reason === "cli_missing");
+    if ((name === "codex" || name === "gemini") && recoverable) {
+      const key = getResolvedApiKey();
+      if (key) return providerInstance(detectProviderFromKey(key)).generate(request);
+    }
+    throw err;
+  }
 }
 
 /** Read-only availability snapshot for the Settings UI (no lane committed). */
