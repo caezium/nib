@@ -19,6 +19,9 @@ it's sent as the reference on every render, it stays on-model across the whole p
 
 *Same character, three looks — and it didn't drift.*
 
+<img src="site/shots/concept.png" width="49%" alt="Concept mode — the studio: a control rail and a plate gallery" />
+<img src="site/shots/article.png" width="49%" alt="Article mode — a shot list you shape: select, add, or expand the ideas, then draw them in parallel" />
+  
 <p>
   <img src="site/concepts/momentum.jpg" width="32%" alt="building momentum — pushing a snowball uphill" />
   <img src="site/concepts/debugging.jpg" width="32%" alt="debugging — pulling one thread from a tangled ball of yarn" />
