@@ -30,8 +30,7 @@
   header { padding: 22px 0; }
   .nav { display: flex; align-items: center; justify-content: space-between; }
   .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 20px; letter-spacing: -0.02em; }
-  .brand .dot { width: 22px; height: 22px; border-radius: 7px; background: var(--ink); display: inline-block; position: relative; }
-  .brand .dot::after { content: ""; position: absolute; right: -3px; bottom: -3px; width: 9px; height: 9px; border-radius: 50%; background: var(--accent); }
+  .brand .logo { width: 26px; height: 26px; display: block; }
   .nav-links a { color: var(--muted); text-decoration: none; font-size: 14px; margin-left: 20px; font-weight: 500; }
   .nav-links a:hover { color: var(--ink); }
 
@@ -114,7 +113,7 @@
 <div class="wrap">
   <header>
     <nav class="nav">
-      <div class="brand"><span class="dot"></span> Nib</div>
+      <div class="brand"><img class="logo" src="favicon.png" alt="Nib logo" width="26" height="26"> Nib</div>
       <div class="nav-links">
         <a href="#looks">Looks</a>
         <a href="#how">How it works</a>
@@ -134,6 +133,11 @@
       <a class="ghost" href="https://github.com/caezium/nib">View on GitHub</a>
     </div>
     <div class="note">Free &amp; open source · works in Claude Code, Codex, Cursor &amp; Gemini</div>
+    <div class="cta" style="margin-top:18px">
+      <button class="cmd" data-copy="brew install --cask caezium/tap/nib">brew install --cask caezium/tap/nib <span class="copy">copy</span></button>
+      <a class="ghost" href="https://github.com/caezium/nib/releases">Download .dmg</a>
+    </div>
+    <div class="note">…or get the native macOS app (Apple Silicon)</div>
   </section>
 
   <section class="gallery">
